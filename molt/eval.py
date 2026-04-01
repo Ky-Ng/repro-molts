@@ -114,7 +114,7 @@ def compute_nmse(
             total_mse += mse
             count += bt.numel()
 
-    mean_mse = total_mse / count * target.shape[1]  # per-sample MSE
+    mean_mse = total_mse / count  # per-element MSE
     target_var = target.var().item()
     return mean_mse / (target_var + 1e-8)
 
