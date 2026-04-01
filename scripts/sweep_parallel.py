@@ -9,17 +9,14 @@ import json
 import os
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import replace
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import torch
-import torch.multiprocessing as mp
 
 from molt.config import MOLTConfig
-from molt.data import collect_activations, make_dataloader, stream_fineweb_tokens
+from molt.data import collect_activations, stream_fineweb_tokens
 from molt.eval import compute_l0, compute_nmse
-from molt.model import MOLT
 from molt.train import train_molt
 
 
@@ -71,8 +68,6 @@ def train_single_lambda(
 
 
 def main():
-    mp.set_start_method("spawn", force=True)
-
     # Configuration
     lambdas = [1e-5, 3e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2]
     max_workers = int(os.environ.get("MOLT_WORKERS", "3"))
@@ -130,17 +125,11 @@ def main():
     train_outputs = mlp_outputs[:-eval_size]
     print(f"Train: {train_inputs.shape[0]} tokens, Eval: {eval_inputs.shape[0]} tokens")
 
-    # Move to shared memory for multiprocessing
-    train_inputs.share_memory_()
-    train_outputs.share_memory_()
-    eval_inputs.share_memory_()
-    eval_outputs.share_memory_()
-
-    # Step 2: Train all λ values in parallel
+    # Step 2: Train all λ values in parallel using threads (shared memory naturally)
     print(f"\n=== Training {len(lambdas)} λ values ({max_workers} concurrent) ===")
     all_results = []
 
-    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
             pool.submit(
                 train_single_lambda,
