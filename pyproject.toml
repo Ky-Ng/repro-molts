@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "repro-molts"
+version = "0.1.0"
+description = "Reproducing Anthropic's Sparse Mixtures of Linear Transforms (MOLTs)"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1",
+    "transformers>=4.45",
+    "datasets>=2.14",
+    "sae-lens>=4.0",
+    "wandb",
+    "pyyaml",
+    "tqdm",
+    "matplotlib",
+    "safetensors",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+interp = ["delphi-ai"]
+
+[tool.setuptools.packages.find]
+include = ["molt*"]
