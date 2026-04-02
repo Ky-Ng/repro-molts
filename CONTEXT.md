@@ -1,6 +1,6 @@
 # MOLT Reproduction — Context & Infrastructure Notes
 
-## Current State (2026-04-01)
+## Current State (2026-04-02)
 
 ### Completed
 - **Phase 1 PoC training** on Gemma-3-1B layer 13, N=1, 10M FineWeb tokens
@@ -15,6 +15,11 @@
   - λ=0 control experiment: still collapses to L0=1.0, NMSE=0.120
   - Plot: `results/training_no_sparsity.png`
   - Checkpoint: `checkpoints/no_sparsity/molt_N1_lam0.0.pt`
+- **Activation/sparsity setup sweep** (λ=0, 2M tokens) — 3 additional setups tested
+  - Added `sparsity_type` config option ("tanh" or "l1") to `molt/config.py` and `molt/model.py`
+  - Results in `results/activation_sweep/`, plot: `results/activation_sweep/activation_sweep_comparison.png`
+  - Cached 2M token activations: `data/activations_2M.pt` (18GB)
+  - See "Activation/Sparsity Setup Sweep" section below for full results
 
 ### Blocked
 - **Sparsity sweep is non-informative** — all λ values produce L0=1.0 (see "L0=1 Collapse" below)
@@ -240,3 +245,41 @@ The collapse is **not caused by the sparsity penalty**. It is an optimization dy
 ### Consequence
 
 The sparsity sweep does not produce a meaningful L0 vs NMSE Pareto frontier. All points cluster at L0=1.0 with NMSE varying from 0.120 to 0.375 (the NMSE variation reflects which specific transform won and its rank, not a sparsity-reconstruction tradeoff). The Jacobian faithfulness is correspondingly low (cosine_sim ≈ 0.015) because a single low-rank transform can only match a small subspace of the full MLP Jacobian.
+
+---
+
+## Activation/Sparsity Setup Sweep (2026-04-02)
+
+### Experiment
+
+Sweep 4 configurations of (sparsity penalty type × gating activation) with λ=0 to isolate the effect of the gating activation on the L0 collapse. Since λ=0, the sparsity penalty type has no effect on training — the only variable that matters is the gating activation (ReLU vs JumpReLU).
+
+### Results
+
+| Sparsity | Activation | λ | L0 | NMSE | Winner Transform |
+|----------|------------|---|-----|------|-----------------|
+| Tanh | JumpReLU | 0.0 | 1.0 | 0.120 | T0 (rank-512, 100%) |
+| **Tanh** | **ReLU** | **0.0** | **0.0** | **1.001** | **None** |
+| **L1** | **ReLU** | **0.0** | **0.0** | **1.001** | **None** |
+| **L1** | **JumpReLU** | **0.0** | **1.0** | **0.166** | **T0 (rank-512, 99.4%)** |
+
+(Bold = new experiments from this sweep. Row 1 is the prior baseline from `checkpoints/no_sparsity/`.)
+
+### Key Findings
+
+1. **ReLU gating collapses to L0=0** (all transforms die). With ReLU activation and λ=0, the model fails to learn entirely — NMSE≈1.0 means the output is approximately zero, no better than predicting the mean. This occurs regardless of sparsity penalty type (Tanh or L1), confirming that the sparsity type is irrelevant at λ=0.
+
+2. **JumpReLU gating collapses to L0=1** (one winner). Both JumpReLU setups (Tanh+JumpReLU and L1+JumpReLU) converge to exactly L0=1.0 with the rank-512 transform T0 winning ~100% of tokens. NMSE is 0.120–0.166, indicating meaningful reconstruction through a single transform.
+
+3. **ReLU vs JumpReLU: dead gates vs winner-take-all.** The critical difference is in gradient flow for inactive gates:
+   - **ReLU** has zero gradient for x≤0. Once a gate goes negative, the gradient `d(gate)/d(pre_act) = 0`, so the gate stays dead permanently. All 31 transforms progressively die during training.
+   - **JumpReLU** (with full STE) passes gradients unconditionally in the backward pass, allowing dead gates to reactivate. This prevents total collapse but still produces winner-take-all dynamics (see "L0=1 Collapse" section above).
+
+4. **Confirmation: sparsity penalty type is orthogonal to the collapse mechanism.** The two ReLU runs (Tanh+ReLU and L1+ReLU) are identical at λ=0, and the two JumpReLU runs (Tanh+JumpReLU and L1+JumpReLU) differ only in NMSE magnitude (0.120 vs 0.166), likely due to random seed effects on which transform wins.
+
+### Infrastructure Changes
+
+- Added `sparsity_type: str = "tanh"` to `MOLTConfig` (options: "tanh", "l1")
+- L1 penalty in `MOLT.forward()`: `mean(|gate_t|) * ||U_t V_t||_F` (replaces tanh wrapping)
+- Scripts: `scripts/run_activation_sweep.py`, `scripts/run_single_setup.py`
+- Cached activations: `data/activations_2M.pt` (2M tokens, 18GB)

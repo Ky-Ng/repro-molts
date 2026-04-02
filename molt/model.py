@@ -164,9 +164,12 @@ class MOLT(nn.Module):
             )
             output = output + group_out
 
-            # Tanh sparsity penalty: Σ_t tanh(mean |gate_t|) * ||U_t V_t||_F
+            # Sparsity penalty: Σ_t penalty(mean |gate_t|) * ||U_t V_t||_F
             mean_abs_gate = gate.abs().mean(dim=0)  # (num_transforms,)
-            sparsity = (torch.tanh(mean_abs_gate) * frob_norms).sum()
+            if self.config.sparsity_type == "l1":
+                sparsity = (mean_abs_gate * frob_norms).sum()
+            else:  # tanh (default)
+                sparsity = (torch.tanh(mean_abs_gate) * frob_norms).sum()
             total_sparsity = total_sparsity + sparsity
 
             # L0: count active transforms (gate > 0)

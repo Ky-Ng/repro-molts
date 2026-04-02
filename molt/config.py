@@ -15,6 +15,7 @@ class MOLTConfig:
     rank_multiplier: int = 1
     activation: str = "jumprelu"  # "relu" or "jumprelu"
     jumprelu_threshold: float = 0.0
+    sparsity_type: str = "tanh"  # "tanh" or "l1"
 
     # Training
     sparsity_coeff: float = 1e-3
