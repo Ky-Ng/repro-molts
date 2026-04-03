@@ -15,12 +15,18 @@ from molt.config import MOLTConfig
 
 
 class JumpReLU(torch.autograd.Function):
-    """JumpReLU with full straight-through estimator.
+    """JumpReLU with smooth surrogate gradient.
 
     Forward: hard threshold (x * 1[x > θ])
-    Backward: full STE — gradients pass through unconditionally so that
-    dead gates can reactivate via MSE gradient signal.
+    Backward: gradient of the smooth surrogate x * σ(x/τ), giving:
+        d/dx = σ(x/τ) + x * σ'(x/τ) / τ
+    This provides gradient proportional to proximity to threshold:
+        - Active gates (x >> 0): gradient ≈ 1 (correct)
+        - Near-threshold (x ≈ 0): gradient ≈ 0.5 (can reactivate)
+        - Deeply-off (x << 0): gradient ≈ 0 (honest zero contribution)
     """
+
+    SURROGATE_TAU = 0.1  # temperature for smooth surrogate
 
     @staticmethod
     def forward(ctx, x: torch.Tensor, threshold: float) -> torch.Tensor:
@@ -30,12 +36,55 @@ class JumpReLU(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        # Full straight-through: always pass gradient so dead gates can reactivate
-        return grad_output, None
+        (x,) = ctx.saved_tensors
+        tau = JumpReLU.SURROGATE_TAU
+        sig = torch.sigmoid(x / tau)
+        # Derivative of smooth surrogate f(x) = x * σ(x/τ)
+        # f'(x) = σ(x/τ) + x * σ(x/τ) * (1 - σ(x/τ)) / τ
+        surrogate_grad = sig + x * sig * (1 - sig) / tau
+        return grad_output * surrogate_grad, None
 
 
 def jumprelu(x: torch.Tensor, threshold: float = 0.0) -> torch.Tensor:
     return JumpReLU.apply(x, threshold)
+
+
+class LearnedJumpReLU(torch.autograd.Function):
+    """JumpReLU with learnable threshold and smooth surrogate gradient.
+
+    Forward: x * 1[x > θ]
+    Backward:
+      - d/dx: smooth surrogate gradient (same as JumpReLU above)
+      - d/dθ: approximate gradient via kernel density at the boundary.
+              Uses -grad_output * x * σ'((x - θ) / τ) / τ
+    """
+
+    SURROGATE_TAU = 0.1
+
+    @staticmethod
+    def forward(ctx, x: torch.Tensor, threshold: torch.Tensor) -> torch.Tensor:
+        ctx.save_for_backward(x, threshold)
+        return x * (x > threshold).float()
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        x, threshold = ctx.saved_tensors
+        tau = LearnedJumpReLU.SURROGATE_TAU
+
+        # Smooth surrogate gradient for x (same as JumpReLU)
+        sig = torch.sigmoid((x - threshold) / tau)
+        surrogate_grad = sig + (x - threshold) * sig * (1 - sig) / tau
+        grad_x = grad_output * surrogate_grad
+
+        # Gradient for threshold: d/dθ [x * H(x - θ)] ≈ -x * σ'((x-θ)/τ) / τ
+        sigmoid_deriv = sig * (1 - sig)
+        grad_threshold = -(grad_output * x * sigmoid_deriv / tau).sum()
+
+        return grad_x, grad_threshold
+
+
+def learned_jumprelu(x: torch.Tensor, threshold: torch.Tensor) -> torch.Tensor:
+    return LearnedJumpReLU.apply(x, threshold)
 
 
 class TransformGroup(nn.Module):
@@ -79,14 +128,19 @@ class TransformGroup(nn.Module):
         nn.init.constant_(self.bias, -1.0)
 
     def forward(
-        self, x: torch.Tensor, activation_fn: str = "jumprelu", threshold: float = 0.0
+        self,
+        x: torch.Tensor,
+        activation_fn: str = "jumprelu",
+        threshold: float | torch.Tensor = 0.0,
+        learned: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass.
 
         Args:
             x: (batch, d_model)
             activation_fn: "relu" or "jumprelu"
-            threshold: JumpReLU threshold
+            threshold: JumpReLU threshold (float or learnable nn.Parameter)
+            learned: if True, use LearnedJumpReLU which passes gradient to threshold
 
         Returns:
             output: (batch, d_model) — sum of gated transforms
@@ -97,7 +151,10 @@ class TransformGroup(nn.Module):
         pre_acts = x @ self.encoder.T - self.bias  # (batch, num_transforms)
 
         if activation_fn == "jumprelu":
-            gate = jumprelu(pre_acts, threshold)
+            if learned:
+                gate = learned_jumprelu(pre_acts, threshold)
+            else:
+                gate = jumprelu(pre_acts, threshold)
         else:
             gate = F.relu(pre_acts)
 
@@ -138,6 +195,14 @@ class MOLT(nn.Module):
                 TransformGroup(num_transforms, config.d_model, rank)
             )
 
+        # Learnable shared JumpReLU threshold (initialized to config value)
+        if config.learned_threshold and config.activation == "jumprelu":
+            self.threshold = nn.Parameter(
+                torch.tensor(config.jumprelu_threshold, dtype=torch.float32)
+            )
+        else:
+            self.threshold = None
+
     def forward(
         self, x: torch.Tensor
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
@@ -158,16 +223,24 @@ class MOLT(nn.Module):
         total_active = torch.tensor(0.0, device=x.device)
         all_gate_acts = []
 
+        use_learned = self.threshold is not None
+        threshold = self.threshold if use_learned else self.config.jumprelu_threshold
+
         for group in self.groups:
             group_out, gate, frob_norms = group.forward(
-                x, self.config.activation, self.config.jumprelu_threshold
+                x, self.config.activation, threshold, learned=use_learned
             )
             output = output + group_out
 
-            # Sparsity penalty: Σ_t penalty(mean |gate_t|) * ||U_t V_t||_F
+            # Sparsity penalty: Σ_t penalty(gate_t) * ||U_t V_t||_F
             mean_abs_gate = gate.abs().mean(dim=0)  # (num_transforms,)
             if self.config.sparsity_type == "l1":
                 sparsity = (mean_abs_gate * frob_norms).sum()
+            elif self.config.sparsity_type == "l0":
+                # L0: penalize count of active gates, smoothed via sigmoid for gradient
+                tau = JumpReLU.SURROGATE_TAU
+                smooth_active = torch.sigmoid(gate / tau).mean(dim=0)  # (num_transforms,)
+                sparsity = (smooth_active * frob_norms).sum()
             else:  # tanh (default)
                 sparsity = (torch.tanh(mean_abs_gate) * frob_norms).sum()
             total_sparsity = total_sparsity + sparsity
@@ -220,4 +293,6 @@ class MOLT(nn.Module):
             "l0": aux["l0"].detach(),
             "total_loss": total.detach(),
         }
+        if self.threshold is not None:
+            metrics["threshold"] = self.threshold.detach()
         return total, metrics

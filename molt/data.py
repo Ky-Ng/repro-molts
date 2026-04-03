@@ -12,6 +12,22 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from molt.config import MOLTConfig
 
 
+def _resolve_mlp_module(model, config):
+    """Resolve the MLP module from a dot-separated path like 'model.layers.{layer_idx}.mlp'."""
+    mlp_path = config.mlp_path
+    if not mlp_path:
+        # Fallback for legacy configs without mlp_path
+        mlp_path = "model.layers.{layer_idx}.mlp"
+    path = mlp_path.format(layer_idx=config.layer_idx)
+    module = model
+    for attr in path.split("."):
+        if attr.isdigit():
+            module = module[int(attr)]
+        else:
+            module = getattr(module, attr)
+    return module
+
+
 def stream_fineweb_tokens(
     config: MOLTConfig,
     num_tokens: int | None = None,
@@ -73,9 +89,11 @@ def collect_activations(
         return data["mlp_inputs"], data["mlp_outputs"]
 
     print(f"Loading model {config.model_name}...")
+    dtype_map = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}
+    model_dtype = dtype_map.get(config.model_dtype, torch.bfloat16)
     model = AutoModelForCausalLM.from_pretrained(
         config.model_name,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=model_dtype,
         device_map=config.device,
     )
     model.eval()
@@ -96,10 +114,10 @@ def collect_activations(
         captured["mlp_output"] = output.detach().float()
         return None
 
-    # Register hooks on the target layer's MLP
-    layer = model.model.layers[config.layer_idx]
-    h_in = layer.mlp.register_forward_pre_hook(hook_mlp_input, with_kwargs=True)
-    h_out = layer.mlp.register_forward_hook(hook_mlp_output)
+    # Register hooks on the target layer's MLP via configurable path
+    mlp_module = _resolve_mlp_module(model, config)
+    h_in = mlp_module.register_forward_pre_hook(hook_mlp_input, with_kwargs=True)
+    h_out = mlp_module.register_forward_hook(hook_mlp_output)
 
     try:
         for i, chunk in enumerate(tqdm(token_chunks, desc="Collecting activations")):
