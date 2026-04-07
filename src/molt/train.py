@@ -32,7 +32,18 @@ def train_molt(
     torch.manual_seed(config.seed)
 
     model = MOLT(config).to(config.device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+
+    # Separate LR for threshold if configured
+    if config.threshold_lr is not None and model.threshold is not None:
+        threshold_params = [model.threshold]
+        other_params = [p for p in model.parameters() if p is not model.threshold]
+        optimizer = torch.optim.Adam([
+            {"params": other_params, "lr": config.lr},
+            {"params": threshold_params, "lr": config.threshold_lr},
+        ])
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+
     dataloader = make_dataloader(mlp_inputs, mlp_outputs, config.batch_size)
 
     # Optional wandb
@@ -45,6 +56,11 @@ def train_molt(
     step = 0
     total_steps = len(dataloader) * config.num_epochs
     warmup_steps = int(total_steps * config.sparsity_warmup_frac)
+
+    # Threshold freeze: keep θ frozen for first N steps, then unfreeze
+    freeze_steps = int(total_steps * config.threshold_freeze_frac)
+    if freeze_steps > 0 and model.threshold is not None:
+        model.threshold.requires_grad_(False)
 
     for epoch in range(config.num_epochs):
         pbar = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{config.num_epochs}")
@@ -61,6 +77,10 @@ def train_molt(
             optimizer.step()
 
             step += 1
+
+            # Unfreeze threshold after freeze period
+            if step == freeze_steps and model.threshold is not None:
+                model.threshold.requires_grad_(True)
 
             if step % config.log_every == 0:
                 log = {k: v.item() for k, v in metrics.items()}

@@ -35,6 +35,9 @@ class MOLTConfig:
     activation: str = "jumprelu"  # "relu" or "jumprelu"
     jumprelu_threshold: float = 0.0
     learned_threshold: bool = False  # if True, JumpReLU threshold is a shared learnable parameter
+    threshold_freeze_frac: float = 0.0  # fraction of training steps to keep θ frozen before unfreezing
+    threshold_lr: float | None = None  # separate LR for threshold (None = same as base lr)
+    max_rank: int | None = None  # max rank for rank distribution (None = default 512)
     sparsity_type: str = "tanh"  # "tanh", "l1", or "l0"
 
     # Training
@@ -69,12 +72,13 @@ class MOLTConfig:
         Ranks are capped at d_model and groups with rank > d_model are dropped.
         """
         n = self.rank_multiplier
+        top_rank = self.max_rank or 512
         base_ranks = [
-            (1 * n, 512),
-            (2 * n, 256),
-            (4 * n, 128),
-            (8 * n, 64),
-            (16 * n, 32),
+            (1 * n, top_rank),
+            (2 * n, top_rank // 2),
+            (4 * n, top_rank // 4),
+            (8 * n, top_rank // 8),
+            (16 * n, top_rank // 16),
         ]
         # Filter out ranks that exceed d_model
         return [(count, rank) for count, rank in base_ranks if rank <= self.d_model]

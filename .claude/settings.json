@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /workspace/repro-molts/experiments/07_gpt2_strong_sparsity/results/*.json)",
+      "Bash(python3 -c ':*)"
+    ]
+  }
+}
