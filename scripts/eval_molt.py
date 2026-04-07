@@ -7,7 +7,6 @@ import json
 import torch
 from transformers import AutoModelForCausalLM
 
-from molt.config import MOLTConfig
 from molt.eval import evaluate_molt
 from molt.train import load_molt
 

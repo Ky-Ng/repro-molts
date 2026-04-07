@@ -8,9 +8,7 @@ from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM
 
-from molt.config import MOLTConfig
-from molt.eval import evaluate_molt, plot_pareto
-from molt.train import load_molt
+from molt.eval import plot_pareto
 from molt.transcoder import evaluate_transcoder
 
 
