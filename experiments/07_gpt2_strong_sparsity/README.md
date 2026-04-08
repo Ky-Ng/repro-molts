@@ -87,3 +87,6 @@ Combining with Experiment 05 baselines:
 
 - Results: `experiments/07_gpt2_strong_sparsity/results/`
 - Figures: `experiments/07_gpt2_strong_sparsity/figures/`
+
+## Bug
+- According to Lindsey et al. 2025, the sparsity penalty should be L1 not L0. We will need to remove L0 as a sparsity penalty in the loss function in future iterations and re-run these sweeps.
