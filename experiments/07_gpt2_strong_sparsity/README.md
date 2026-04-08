@@ -37,9 +37,51 @@ uv run python experiments/07_gpt2_strong_sparsity/run.py l0_jumprelu_lam1e-02
 | L0 | 1e-5 | -0.478 |
 | L0 | 1e-4 | **-0.572** |
 
-## Results
+## Results (10/20 runs complete — lambda=1e-3, 3e-3, plus tanh at 1e-2)
 
-_To be filled after running._
+### Full Table
+
+| Sparsity | Activation | lambda | L0 | NMSE | theta_final | #Active |
+|----------|------------|--------|------|------|-------------|---------|
+| Tanh | ReLU | 1e-3 | 14.95 | 0.493 | fixed | 31 |
+| Tanh | JumpReLU | 1e-3 | 14.07 | 0.475 | -0.406 | 31 |
+| L0 | ReLU | 1e-3 | 14.52 | 0.503 | fixed | 31 |
+| L0 | JumpReLU | 1e-3 | 7.50 | 0.477 | **-1.110** | 31 |
+| Tanh | ReLU | 3e-3 | 10.88 | 0.502 | fixed | 31 |
+| Tanh | JumpReLU | 3e-3 | 15.00 | 0.479 | -0.449 | 31 |
+| L0 | ReLU | 3e-3 | 11.52 | 0.527 | fixed | 31 |
+| L0 | JumpReLU | 3e-3 | 2.82 | 0.493 | **-2.319** | 30 |
+| Tanh | ReLU | 1e-2 | 4.36 | 0.561 | fixed | 15 |
+| Tanh | JumpReLU | 1e-2 | 13.39 | 0.522 | -0.116 | 31 |
+
+### Theta Trajectory (JumpReLU + L0 penalty)
+
+Combining with Experiment 05 baselines:
+
+| lambda | theta | L0 | NMSE |
+|--------|-------|-----|------|
+| 0 | -0.466 | 14.46 | 0.474 |
+| 1e-5 | -0.478 | 14.32 | 0.473 |
+| 1e-4 | -0.572 | 13.06 | 0.472 |
+| 1e-3 | **-1.110** | 7.50 | 0.477 |
+| 3e-3 | **-2.319** | 2.82 | 0.493 |
+
+### Preliminary Analysis
+
+1. **L0 + JumpReLU: theta goes strongly negative** under increasing sparsity pressure. The trend is clear and accelerating: theta roughly doubles in magnitude for each 3x increase in lambda.
+
+2. **Tanh + JumpReLU: theta is non-monotonic.** It went from -0.449 (lambda=3e-3) to -0.116 (lambda=1e-2). The Tanh penalty does not consistently drive theta negative — it saturates because `tanh(mean|gate|)` is near 1.0 for active transforms, providing near-zero gradient to discriminate between them.
+
+3. **L0 penalty is far more effective at sparsity.** At lambda=3e-3, L0+JumpReLU achieves L0=2.82 while Tanh+JumpReLU stays at L0=15.0. The L0 penalty pushes theta more negative (opening more gates) while simultaneously reducing the *number* of active transforms — the remaining transforms absorb the work of pruned ones.
+
+4. **NMSE degrades slowly.** Even at L0=2.82, NMSE is only 0.493 (vs 0.474 at L0=14.5 baseline). The sparsity-reconstruction tradeoff is favorable.
+
+5. **Tanh+ReLU at lambda=1e-2 shows transform death.** Only 15/31 transforms remain active, with L0 dropping to 4.36. This is the ReLU dead-gate dynamic being amplified by the sparsity penalty.
+
+### Remaining runs (in progress)
+
+- L0 penalty: lambda=1e-2 (both ReLU and JumpReLU)
+- All 4 setups at lambda=3e-2 and lambda=1e-1
 
 ## Artifacts
 

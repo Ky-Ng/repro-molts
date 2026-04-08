@@ -29,20 +29,50 @@ uv run python experiments/08_gemma_anti_collapse/run.py
 
 ## Results
 
-| Setup | L0 | NMSE | θ | Notes |
-|-------|----|------|---|-------|
-| fixed_theta_surrogate | | | 0.0 | |
-| theta_warmup_25pct | | | | |
-| theta_warmup_50pct | | | | |
-| theta_warmup_75pct | | | | |
-| theta_lr_1e-4 | | | | |
-| theta_lr_1e-5 | | | | |
-| theta_lr_1e-6 | | | | |
-| max_rank_768 | | | 0.0 | |
+| Setup | L0 | NMSE | Final θ | Notes |
+|-------|----|------|---------|-------|
+| fixed_theta_surrogate | 0.0 | 1.001 | 0.0 (fixed) | Collapsed — θ runaway not the cause |
+| theta_warmup_25pct | 0.0 | 1.001 | 0.780 | Collapsed — θ ran away after unfreeze |
+| theta_warmup_50pct | 0.0 | 1.001 | 0.445 | Collapsed — same pattern |
+| theta_warmup_75pct | 0.0 | 1.001 | — | OOM killed at 28%, already L0=0 |
+| theta_lr_1e-4 | 0.0 | 1.001 | 0.114 | Collapsed — θ still drifted up |
+| theta_lr_1e-5 | 0.0 | 1.001 | 0.015 | Collapsed — θ barely moved, still died |
+| theta_lr_1e-6 | 0.0 | 1.001 | 0.002 | Collapsed — θ effectively frozen, still died |
+| max_rank_768 | 0.0 | 1.001 | 0.0 (fixed) | Collapsed — higher rank did not help |
+
+**All 8 setups collapsed to L0=0, NMSE≈1.0 (outputting nothing).**
 
 ## Analysis
 
-*Fill after running.*
+### Key finding: the collapse is NOT caused by θ dynamics
+
+The most important result is `fixed_theta_surrogate` and `theta_lr_1e-6`: even with θ permanently at 0.0 (or effectively frozen at 0.002), all transforms still die. This rules out θ runaway as the root cause of collapse on Gemma.
+
+### The smooth surrogate backward pass itself is the problem
+
+The collapse happens purely through the gating gradient dynamics:
+- The smooth surrogate backward computes `σ(x/τ) + x·σ'(x/τ)/τ` with τ=0.1
+- On Gemma's narrow pre-activation distribution (std≈0.45), this gradient landscape creates a winner-take-all dynamic that kills transforms even at fixed θ=0
+- This contrasts with the hard STE (exp 06), which at least preserves L0=1
+
+### Higher rank (768) did not help
+
+Increasing max rank from 512→768 to match GPT-2's 67% coverage ratio made no difference. The dimensionality bootstrapping hypothesis alone does not explain the collapse — the gating mechanism itself is fundamentally incompatible with Gemma's activation statistics.
+
+### θ warmup confirms the timeline
+
+The warmup runs show that collapse happens *while θ is frozen*:
+- At 14% progress (well within the 25% freeze window), `theta_warmup_25pct` was already at L0=0
+- The transforms die from the smooth surrogate gradient alone, before θ ever moves
+- After unfreezing, θ then runs away to wherever the dead-gate gradient pushes it (0.78 for 25pct, 0.44 for 50pct — less time to drift = lower final θ)
+
+### Implications for next experiments
+
+The smooth surrogate JumpReLU is incompatible with Gemma-3-1B at this scale. Possible next directions:
+1. **Use hard STE (identity backward) with fixed θ=0** — this at least achieves L0=1 (exp 06), then focus on breaking the winner-take-all to L0>1
+2. **Replace JumpReLU entirely** — try sigmoid gating, softmax gating, or top-k routing
+3. **Auxiliary diversity loss** — penalize gate correlation or reward multiple active transforms
+4. **Much longer training** — the paper uses far more tokens; perhaps 2M is insufficient for Gemma's scale
 
 ## Artifacts
 
