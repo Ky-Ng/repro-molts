@@ -1,0 +1,14 @@
+{
+  "name": "molt_1x_lam0e+00",
+  "method": "molt",
+  "scale": "1x",
+  "rank_multiplier": 1,
+  "num_epochs": 1,
+  "sparsity_coeff": 0.0,
+  "l0": 26.89,
+  "nmse": 0.694098,
+  "jacobian_cosine_sim": 0.275476,
+  "jacobian_cosine_sim_std": 0.026522,
+  "params": 3955999,
+  "training_time_s": 13.8
+}

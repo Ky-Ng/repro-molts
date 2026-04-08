@@ -190,21 +190,21 @@ def plot_all_results(results: list[dict]) -> None:
         tc_s = [r for r in tc_results if r["scale"] == scale]
         if molt_s:
             ax.scatter(
-                [r["l0"] for r in molt_s], [r["nmse"] for r in molt_s],
+                [r["nmse"] for r in molt_s], [r["l0"] for r in molt_s],
                 marker="o", s=80, color=color, label=f"MOLT {scale}",
                 edgecolors="black", linewidths=0.5,
             )
         if tc_s:
             ax.scatter(
-                [r["l0"] for r in tc_s], [r["nmse"] for r in tc_s],
+                [r["nmse"] for r in tc_s], [r["l0"] for r in tc_s],
                 marker="x", s=100, color=color, label=f"Transcoder {scale}",
                 linewidths=2,
             )
 
-    ax.set_xlabel("L0 (Active Transforms / Features)", fontsize=12)
-    ax.set_ylabel("Normalized MSE", fontsize=12)
-    ax.set_title("L0 vs NMSE — MOLT vs Transcoder (GPT-2 Layer 6)", fontsize=13)
-    ax.set_yscale("log")
+    ax.set_xlabel("Normalized MSE", fontsize=12)
+    ax.set_ylabel("L0 (Active Transforms / Features)", fontsize=12)
+    ax.set_title("NMSE vs L0 — MOLT vs Transcoder (GPT-2 Layer 6)", fontsize=13)
+    ax.set_xscale("log")
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()

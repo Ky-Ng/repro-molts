@@ -169,8 +169,8 @@ def plot_l0_vs_nmse(results: dict, figures_dir: Path):
         key = f"{sp}_{act}"
         marker, color = markers.get(key, ("x", "gray"))
         lam = r.get("sparsity_coeff", 0)
-        ax.scatter(r["l0"], r["nmse"], marker=marker, color=color, s=80, zorder=3)
-        ax.annotate(f"{lam:.0e}", (r["l0"], r["nmse"]), fontsize=7,
+        ax.scatter(r["nmse"], r["l0"], marker=marker, color=color, s=80, zorder=3)
+        ax.annotate(f"{lam:.0e}", (r["nmse"], r["l0"]), fontsize=7,
                     textcoords="offset points", xytext=(5, 5), alpha=0.7)
 
     # Legend entries
@@ -178,9 +178,9 @@ def plot_l0_vs_nmse(results: dict, figures_dir: Path):
         label = key.replace("_", " + ").replace("tanh", "Tanh").replace("l0", "L0").replace("relu", "ReLU").replace("jump", "Jump")
         ax.scatter([], [], marker=marker, color=color, s=80, label=label)
 
-    ax.set_xlabel("L0 (Active Transforms)")
-    ax.set_ylabel("Normalized MSE")
-    ax.set_title("L0 vs NMSE — All Configurations")
+    ax.set_xlabel("Normalized MSE")
+    ax.set_ylabel("L0 (Active Transforms)")
+    ax.set_title("NMSE vs L0 — All Configurations")
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
 

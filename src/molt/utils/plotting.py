@@ -129,31 +129,31 @@ def plot_l0_vs_nmse(
 
     l0s = [r["l0"] for r in results]
     nmses = [r["nmse"] for r in results]
-    ax.scatter(l0s, nmses, label="MOLT", marker="o", s=60)
+    ax.scatter(nmses, l0s, label="MOLT", marker="o", s=60)
 
     # Pareto frontier
-    sorted_pts = sorted(zip(l0s, nmses), key=lambda p: p[0])
-    pareto_l0, pareto_nmse = [], []
-    min_nmse = float("inf")
-    for l0, nmse in sorted_pts:
-        if nmse < min_nmse:
-            pareto_l0.append(l0)
+    sorted_pts = sorted(zip(nmses, l0s), key=lambda p: p[0])
+    pareto_nmse, pareto_l0 = [], []
+    min_l0 = float("inf")
+    for nmse, l0 in sorted_pts:
+        if l0 < min_l0:
             pareto_nmse.append(nmse)
-            min_nmse = nmse
-    ax.plot(pareto_l0, pareto_nmse, "--", alpha=0.5, color="tab:blue")
+            pareto_l0.append(l0)
+            min_l0 = l0
+    ax.plot(pareto_nmse, pareto_l0, "--", alpha=0.5, color="tab:blue")
 
     if transcoder_results:
         tc_l0s = [r["l0"] for r in transcoder_results]
         tc_nmses = [r["nmse"] for r in transcoder_results]
         labels = [r.get("label", "Transcoder") for r in transcoder_results]
         for l0, nmse, label in zip(tc_l0s, tc_nmses, labels):
-            ax.scatter([l0], [nmse], marker="x", s=100, label=label)
+            ax.scatter([nmse], [l0], marker="x", s=100, label=label)
 
-    ax.set_xlabel("L0 (Active Transforms / Features)")
-    ax.set_ylabel("Normalized MSE")
-    ax.set_title("L0 vs. Normalized MSE")
+    ax.set_xlabel("Normalized MSE")
+    ax.set_ylabel("L0 (Active Transforms / Features)")
+    ax.set_title("Normalized MSE vs. L0")
     ax.legend()
-    ax.set_yscale("log")
+    ax.set_xscale("log")
     ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
