@@ -1,0 +1,8 @@
+{
+  "name": "orthogonal_freeze_25pct",
+  "init": "orthogonal",
+  "gate_freeze_frac": 0.25,
+  "l0": 0.22,
+  "nmse": 1.0092,
+  "training_time_s": 234.2
+}

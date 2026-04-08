@@ -43,12 +43,12 @@ BASE_CONFIG = dict(
     d_model=1152,
     layer_idx=13,
     num_tokens=2_000_000,
-    batch_size=64,
+    batch_size=4096,
     lr=1e-3,
     device="cuda",
     sparsity_coeff=0.0,
     sparsity_warmup_frac=0.0,
-    log_every=100,
+    log_every=10,
     activation="jumprelu",
     learned_threshold=False,
     jumprelu_threshold=0.0,
@@ -87,7 +87,7 @@ def init_orthogonal_encoders(model: MOLT):
             n = group.num_transforms
             if n <= d:
                 q, _ = torch.linalg.qr(torch.randn(d, n))
-                group.encoder.data = q[:, :n].T  # (n, d)
+                group.encoder.copy_(q[:, :n].T)
             else:
                 blocks = []
                 remaining = n
@@ -96,7 +96,7 @@ def init_orthogonal_encoders(model: MOLT):
                     q, _ = torch.linalg.qr(torch.randn(d, take))
                     blocks.append(q[:, :take].T)
                     remaining -= take
-                group.encoder.data = torch.cat(blocks, dim=0)[:n]
+                group.encoder.copy_(torch.cat(blocks, dim=0)[:n])
 
 
 def init_pca_encoders(model: MOLT, mlp_inputs: torch.Tensor, sample_size: int = 50_000):
@@ -117,7 +117,7 @@ def init_pca_encoders(model: MOLT, mlp_inputs: torch.Tensor, sample_size: int = 
         for group in model.groups:
             n = group.num_transforms
             indices = (torch.arange(n) + offset) % d
-            group.encoder.data = Vh[indices]
+            group.encoder.copy_(Vh[indices])
             offset += n
 
 

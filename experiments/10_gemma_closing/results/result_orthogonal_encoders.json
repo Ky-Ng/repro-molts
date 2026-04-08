@@ -1,0 +1,8 @@
+{
+  "name": "orthogonal_encoders",
+  "init": "orthogonal",
+  "gate_freeze_frac": 0.0,
+  "l0": 0.26,
+  "nmse": 1.0645,
+  "training_time_s": 288.4
+}

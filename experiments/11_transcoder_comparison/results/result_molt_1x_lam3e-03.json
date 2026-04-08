@@ -1,0 +1,12 @@
+{
+  "name": "molt_1x_lam3e-03",
+  "method": "molt",
+  "scale": "1x",
+  "rank_multiplier": 1,
+  "num_epochs": 1,
+  "sparsity_coeff": 0.003,
+  "l0": 9.15,
+  "nmse": 0.697304,
+  "params": 3955999,
+  "training_time_s": 17.1
+}

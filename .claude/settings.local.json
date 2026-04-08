@@ -3,7 +3,8 @@
     "allow": [
       "WebFetch(domain:github.com)",
       "Bash(python3 -c ':*)",
-      "Bash(ps aux:*)"
+      "Bash(ps aux:*)",
+      "Bash(kill :*)"
     ]
   }
 }

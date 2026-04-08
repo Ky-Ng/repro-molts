@@ -4,166 +4,166 @@
   "sparsity_type": "l0",
   "learned_threshold": false,
   "sparsity_coeff": 0.001,
-  "l0": 14.52,
-  "nmse": 0.5025,
+  "l0": 14.87,
+  "nmse": 0.5014,
   "final_threshold": null,
   "num_active": 31,
   "active_transforms": [
     {
       "transform": 0,
       "rank": 512,
-      "frequency": 71.1
+      "frequency": 77.7
     },
     {
       "transform": 1,
       "rank": 256,
-      "frequency": 78.7
+      "frequency": 84.8
     },
     {
       "transform": 2,
       "rank": 256,
-      "frequency": 85.4
+      "frequency": 67.4
     },
     {
       "transform": 3,
       "rank": 128,
-      "frequency": 73.0
+      "frequency": 71.3
     },
     {
       "transform": 4,
       "rank": 128,
-      "frequency": 87.7
+      "frequency": 51.8
     },
     {
       "transform": 5,
       "rank": 128,
-      "frequency": 40.8
+      "frequency": 29.7
     },
     {
       "transform": 6,
       "rank": 128,
-      "frequency": 49.4
+      "frequency": 87.1
     },
     {
       "transform": 7,
       "rank": 64,
-      "frequency": 87.5
+      "frequency": 33.4
     },
     {
       "transform": 8,
       "rank": 64,
-      "frequency": 47.9
+      "frequency": 76.2
     },
     {
       "transform": 9,
       "rank": 64,
-      "frequency": 43.4
+      "frequency": 46.1
     },
     {
       "transform": 10,
       "rank": 64,
-      "frequency": 43.4
+      "frequency": 69.7
     },
     {
       "transform": 11,
       "rank": 64,
-      "frequency": 64.1
+      "frequency": 38.7
     },
     {
       "transform": 12,
       "rank": 64,
-      "frequency": 29.9
+      "frequency": 71.9
     },
     {
       "transform": 13,
       "rank": 64,
-      "frequency": 60.2
+      "frequency": 38.7
     },
     {
       "transform": 14,
       "rank": 64,
-      "frequency": 60.4
+      "frequency": 47.5
     },
     {
       "transform": 15,
       "rank": 32,
-      "frequency": 21.5
+      "frequency": 34.6
     },
     {
       "transform": 16,
       "rank": 32,
-      "frequency": 31.4
+      "frequency": 42.0
     },
     {
       "transform": 17,
       "rank": 32,
-      "frequency": 35.0
+      "frequency": 49.4
     },
     {
       "transform": 18,
       "rank": 32,
-      "frequency": 54.7
+      "frequency": 14.3
     },
     {
       "transform": 19,
       "rank": 32,
-      "frequency": 32.2
+      "frequency": 30.9
     },
     {
       "transform": 20,
       "rank": 32,
-      "frequency": 46.1
+      "frequency": 51.8
     },
     {
       "transform": 21,
       "rank": 32,
-      "frequency": 25.2
+      "frequency": 41.2
     },
     {
       "transform": 22,
       "rank": 32,
-      "frequency": 41.4
+      "frequency": 66.0
     },
     {
       "transform": 23,
       "rank": 32,
-      "frequency": 53.3
+      "frequency": 45.3
     },
     {
       "transform": 24,
       "rank": 32,
-      "frequency": 18.2
+      "frequency": 41.0
     },
     {
       "transform": 25,
       "rank": 32,
-      "frequency": 15.2
+      "frequency": 23.8
     },
     {
       "transform": 26,
       "rank": 32,
-      "frequency": 41.6
+      "frequency": 24.8
     },
     {
       "transform": 27,
       "rank": 32,
-      "frequency": 39.1
+      "frequency": 37.1
     },
     {
       "transform": 28,
       "rank": 32,
-      "frequency": 46.5
+      "frequency": 77.1
     },
     {
       "transform": 29,
       "rank": 32,
-      "frequency": 25.8
+      "frequency": 23.2
     },
     {
       "transform": 30,
       "rank": 32,
-      "frequency": 51.6
+      "frequency": 78.3
     }
   ],
-  "training_time_s": 477.0
+  "training_time_s": 3054.7
 }

@@ -1,0 +1,12 @@
+{
+  "name": "molt_4x_lam3e-03",
+  "method": "molt",
+  "scale": "4x",
+  "rank_multiplier": 4,
+  "num_epochs": 4,
+  "sparsity_coeff": 0.003,
+  "l0": 16.85,
+  "nmse": 0.492623,
+  "params": 15823996,
+  "training_time_s": 60.6
+}

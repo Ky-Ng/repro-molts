@@ -1,0 +1,8 @@
+{
+  "name": "gate_freeze_50pct",
+  "init": "default",
+  "gate_freeze_frac": 0.5,
+  "l0": 0.29,
+  "nmse": 1.011,
+  "training_time_s": 242.8
+}
