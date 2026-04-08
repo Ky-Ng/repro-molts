@@ -113,6 +113,16 @@ def plot_multi_run_curves(
     print(f"Saved plot to {save_path}")
 
 
+def _format_l0_axis(ax, is_x: bool = True) -> None:
+    """Format an L0 axis with non-scientific notation and ticks every 500."""
+    if is_x:
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(500))
+        ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{int(x)}"))
+    else:
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(500))
+        ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{int(x)}"))
+
+
 def plot_l0_vs_nmse(
     results: list[dict],
     save_path: str | Path,
@@ -129,31 +139,32 @@ def plot_l0_vs_nmse(
 
     l0s = [r["l0"] for r in results]
     nmses = [r["nmse"] for r in results]
-    ax.scatter(nmses, l0s, label="MOLT", marker="o", s=60)
+    ax.scatter(l0s, nmses, label="MOLT", marker="o", s=60)
 
     # Pareto frontier
-    sorted_pts = sorted(zip(nmses, l0s), key=lambda p: p[0])
-    pareto_nmse, pareto_l0 = [], []
-    min_l0 = float("inf")
-    for nmse, l0 in sorted_pts:
-        if l0 < min_l0:
-            pareto_nmse.append(nmse)
+    sorted_pts = sorted(zip(l0s, nmses), key=lambda p: p[0])
+    pareto_l0, pareto_nmse = [], []
+    min_nmse = float("inf")
+    for l0, nmse in sorted_pts:
+        if nmse < min_nmse:
             pareto_l0.append(l0)
-            min_l0 = l0
-    ax.plot(pareto_nmse, pareto_l0, "--", alpha=0.5, color="tab:blue")
+            pareto_nmse.append(nmse)
+            min_nmse = nmse
+    ax.plot(pareto_l0, pareto_nmse, "--", alpha=0.5, color="tab:blue")
 
     if transcoder_results:
         tc_l0s = [r["l0"] for r in transcoder_results]
         tc_nmses = [r["nmse"] for r in transcoder_results]
         labels = [r.get("label", "Transcoder") for r in transcoder_results]
         for l0, nmse, label in zip(tc_l0s, tc_nmses, labels):
-            ax.scatter([nmse], [l0], marker="x", s=100, label=label)
+            ax.scatter([l0], [nmse], marker="x", s=100, label=label)
 
-    ax.set_xlabel("Normalized MSE")
-    ax.set_ylabel("L0 (Active Transforms / Features)")
-    ax.set_title("Normalized MSE vs. L0")
+    ax.set_xlabel("L0 (Active Transforms / Features)")
+    ax.set_ylabel("Normalized MSE")
+    ax.set_title("L0 vs. Normalized MSE")
     ax.legend()
-    ax.set_xscale("log")
+    ax.set_yscale("log")
+    _format_l0_axis(ax, is_x=True)
     ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
@@ -161,3 +172,71 @@ def plot_l0_vs_nmse(
     fig.savefig(save_path, dpi=150)
     plt.close(fig)
     print(f"Saved Pareto plot to {save_path}")
+
+
+def plot_comparison(
+    molt_results: list[dict],
+    tc_results: list[dict],
+    x_key: str,
+    y_key: str,
+    save_path: str | Path,
+    *,
+    title: str = "",
+    x_label: str = "",
+    y_label: str = "",
+    scale_colors: dict[str, str] | None = None,
+) -> None:
+    """Plot MOLT vs transcoder comparison scatter with per-scale grouping.
+
+    Args:
+        molt_results: list of MOLT result dicts
+        tc_results: list of transcoder result dicts
+        x_key: result dict key for x-axis (e.g. "l0", "nmse")
+        y_key: result dict key for y-axis (e.g. "jacobian_cosine_sim", "nmse")
+        save_path: path to save the PNG
+        title: figure title
+        x_label: x-axis label
+        y_label: y-axis label
+        scale_colors: {scale_name: color} mapping
+    """
+    if scale_colors is None:
+        scale_colors = {"1x": "tab:blue", "2x": "tab:orange", "4x": "tab:green", "8x": "tab:red"}
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+
+    for scale, color in scale_colors.items():
+        molt_s = sorted([r for r in molt_results if r.get("scale") == scale], key=lambda r: r[x_key])
+        tc_s = sorted([r for r in tc_results if r.get("scale") == scale], key=lambda r: r[x_key])
+
+        if molt_s:
+            xs = [r[x_key] for r in molt_s]
+            ys = [r[y_key] for r in molt_s]
+            ax.scatter(xs, ys, marker="o", s=80, color=color, label=f"MOLT {scale}",
+                       edgecolors="black", linewidths=0.5)
+            ax.plot(xs, ys, "--", color=color, alpha=0.4, linewidth=1)
+
+        if tc_s:
+            xs = [r[x_key] for r in tc_s]
+            ys = [r[y_key] for r in tc_s]
+            ax.scatter(xs, ys, marker="x", s=100, color=color, label=f"Transcoder {scale}",
+                       linewidths=2)
+            ax.plot(xs, ys, ":", color=color, alpha=0.4, linewidth=1)
+
+    ax.set_xlabel(x_label or x_key, fontsize=12)
+    ax.set_ylabel(y_label or y_key, fontsize=12)
+    if title:
+        ax.set_title(title, fontsize=13)
+
+    # Format L0 axis with non-scientific notation and 500-step ticks
+    if x_key == "l0":
+        _format_l0_axis(ax, is_x=True)
+    if y_key == "l0":
+        _format_l0_axis(ax, is_x=False)
+
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+    print(f"Saved: {save_path}")

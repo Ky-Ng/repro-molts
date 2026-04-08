@@ -1,0 +1,119 @@
+{
+  "name": "l0_relu_lam1e-02",
+  "activation": "relu",
+  "sparsity_type": "l0",
+  "learned_threshold": false,
+  "sparsity_coeff": 0.01,
+  "l0": 5.38,
+  "nmse": 0.5957,
+  "final_threshold": null,
+  "num_active": 21,
+  "active_transforms": [
+    {
+      "transform": 0,
+      "rank": 512,
+      "frequency": 50.2
+    },
+    {
+      "transform": 1,
+      "rank": 256,
+      "frequency": 78.9
+    },
+    {
+      "transform": 2,
+      "rank": 256,
+      "frequency": 50.0
+    },
+    {
+      "transform": 3,
+      "rank": 128,
+      "frequency": 35.0
+    },
+    {
+      "transform": 4,
+      "rank": 128,
+      "frequency": 38.5
+    },
+    {
+      "transform": 5,
+      "rank": 128,
+      "frequency": 28.5
+    },
+    {
+      "transform": 6,
+      "rank": 128,
+      "frequency": 66.6
+    },
+    {
+      "transform": 7,
+      "rank": 64,
+      "frequency": 16.4
+    },
+    {
+      "transform": 8,
+      "rank": 64,
+      "frequency": 15.8
+    },
+    {
+      "transform": 9,
+      "rank": 64,
+      "frequency": 36.5
+    },
+    {
+      "transform": 10,
+      "rank": 64,
+      "frequency": 14.1
+    },
+    {
+      "transform": 11,
+      "rank": 64,
+      "frequency": 16.4
+    },
+    {
+      "transform": 12,
+      "rank": 64,
+      "frequency": 25.6
+    },
+    {
+      "transform": 13,
+      "rank": 64,
+      "frequency": 5.5
+    },
+    {
+      "transform": 14,
+      "rank": 64,
+      "frequency": 52.1
+    },
+    {
+      "transform": 20,
+      "rank": 32,
+      "frequency": 0.4
+    },
+    {
+      "transform": 21,
+      "rank": 32,
+      "frequency": 0.6
+    },
+    {
+      "transform": 23,
+      "rank": 32,
+      "frequency": 0.6
+    },
+    {
+      "transform": 25,
+      "rank": 32,
+      "frequency": 0.4
+    },
+    {
+      "transform": 28,
+      "rank": 32,
+      "frequency": 0.2
+    },
+    {
+      "transform": 29,
+      "rank": 32,
+      "frequency": 0.4
+    }
+  ],
+  "training_time_s": 1068.0
+}

@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import gc
 import json
 import time
 from pathlib import Path
@@ -148,14 +149,19 @@ def train_transcoder_gpu(
 # MLP extraction
 # ---------------------------------------------------------------------------
 
+_MLP_MODULE = None  # global reference for dtype conversion
+
+
 def get_gpt2_mlp_fn(device: str = "cuda"):
     """Load GPT-2 and return the layer-6 MLP forward function."""
+    global _MLP_MODULE
     print("Loading GPT-2 for Jacobian reference...")
     gpt2 = AutoModelForCausalLM.from_pretrained(MODEL)
     mlp = gpt2.transformer.h[LAYER_IDX].mlp
     mlp = mlp.to(device).eval()
     for p in mlp.parameters():
         p.requires_grad_(False)
+    _MLP_MODULE = mlp
 
     # Free the rest of GPT-2
     del gpt2
@@ -168,73 +174,111 @@ def get_gpt2_mlp_fn(device: str = "cuda"):
 
 
 # ---------------------------------------------------------------------------
-# Jacobian evaluation (manual autograd — JumpReLU doesn't support functorch)
+# Jacobian evaluation
 # ---------------------------------------------------------------------------
+# JumpReLU uses autograd.Function which doesn't support functorch (vmap/jacrev).
+# We build a functorch-compatible MOLT forward using the smooth surrogate directly.
 
-def compute_jacobian_manual(fn, x):
-    """Compute Jacobian row-by-row using standard autograd.
+def _make_fp16_mlp_fn(mlp_fn):
+    """Wrap MLP to work with fp16 inputs by casting in/out."""
+    def fn(x):
+        return mlp_fn(x.float()).half()
+    return fn
+
+
+def _make_molt_smooth_fn(model):
+    """Create a functorch-compatible single-input MOLT forward function.
+
+    Uses the smooth surrogate x * sigmoid(x / tau) instead of JumpReLU's
+    autograd.Function, which doesn't support functorch transforms.
+    """
+    tau = 0.1  # same as JumpReLU.SURROGATE_TAU
+    threshold = model.config.jumprelu_threshold
+
+    def fn(x):
+        """Single input forward: x is (d,), returns (d,)."""
+        output = torch.zeros(x.shape[0], device=x.device)
+        for group in model.groups:
+            pre_acts = x @ group.encoder.T - group.bias  # (n_transforms,)
+            gate = pre_acts * torch.sigmoid((pre_acts - threshold) / tau)
+            Vx = torch.einsum("nrd,d->nr", group.V, x)  # (n_transforms, rank)
+            UVx = torch.einsum("ndr,nr->nd", group.U, Vx)  # (n_transforms, d)
+            gated = UVx * gate.unsqueeze(-1)  # (n_transforms, d)
+            output = output + gated.sum(dim=0)
+        return output
+
+    return fn
+
+
+def _make_tc_fn(model):
+    """Create a functorch-compatible single-input transcoder forward function."""
+    def fn(x):
+        h = F.relu(x @ model.W_enc.T + model.b_enc)
+        return h @ model.W_dec.T + model.b_dec
+    return fn
+
+
+def compute_jacobian_faithfulness(model_fn, mlp_fn, eval_in, n_samples, device="cuda", use_fp16=False):
+    """Compute Jacobian cosine similarity using jacrev with chunking.
 
     Args:
-        fn: function mapping (d,) -> (d,)
-        x: single input (d,)
-
-    Returns:
-        jacobian: (d, d) matrix
+        model_fn: single-input function (d,) -> (d,), functorch-compatible
+        mlp_fn: reference MLP function, single-input (d,) -> (d,)
+        eval_in: evaluation inputs on CPU
+        n_samples: number of samples to use
+        device: compute device
+        use_fp16: if True, compute in float16 (saves ~50% memory for large models)
     """
-    d = x.shape[0]
-    x = x.detach().requires_grad_(True)
-    y = fn(x)
-    jac_rows = []
-    for i in range(d):
-        grad = torch.autograd.grad(y[i], x, retain_graph=(i < d - 1))[0]
-        jac_rows.append(grad.detach())
-    return torch.stack(jac_rows)  # (d, d)
+    from torch.func import jacrev
+
+    dtype = torch.float16 if use_fp16 else torch.float32
+    jac_x = eval_in[:n_samples].to(device=device, dtype=dtype)
+
+    chunk = 32
+    jac_model_fn = jacrev(model_fn, chunk_size=chunk)
+    jac_mlp_fn = jacrev(mlp_fn, chunk_size=chunk)
+
+    all_sims = []
+
+    for i in range(n_samples):
+        xi = jac_x[i]
+        j_model = jac_model_fn(xi)  # (d, d)
+        j_mlp = jac_mlp_fn(xi)      # (d, d)
+
+        # Cosine similarity in float32 for numerical stability
+        sim = F.cosine_similarity(
+            j_model.float().flatten().unsqueeze(0),
+            j_mlp.float().flatten().unsqueeze(0),
+        )
+        all_sims.append(sim.detach().cpu())
+        del j_model, j_mlp
+        torch.cuda.empty_cache()
+
+    sims = torch.cat(all_sims)
+    return sims.mean().item(), sims.std().item()
 
 
-def jacobian_cosine_sim(fn_a, fn_b, x_batch, device="cuda"):
-    """Compute per-sample Jacobian cosine similarity between two functions.
-
-    Processes one sample at a time to avoid OOM.
-    """
-    sims = []
-    for i in range(len(x_batch)):
-        xi = x_batch[i].to(device)
-        j_a = compute_jacobian_manual(fn_a, xi)  # (d, d)
-        j_b = compute_jacobian_manual(fn_b, xi)  # (d, d)
-        sim = F.cosine_similarity(j_a.flatten().unsqueeze(0), j_b.flatten().unsqueeze(0)).item()
-        sims.append(sim)
-    return torch.tensor(sims)
-
-
-def compute_jacobian_for_molt(model, mlp_fn, eval_in, device="cuda"):
+def compute_jacobian_for_molt(model, mlp_fn, eval_in, device="cuda", use_fp16=False):
     """Compute Jacobian faithfulness for a MOLT model."""
-    jac_x = eval_in[:JACOBIAN_SAMPLES]
-
-    def molt_fn(xi):
-        out, _ = model(xi.unsqueeze(0))
-        return out.squeeze(0)
-
-    sims = jacobian_cosine_sim(molt_fn, mlp_fn, jac_x, device=device)
-    return sims.mean().item(), sims.std().item()
+    if use_fp16:
+        model = model.half()
+    molt_fn = _make_molt_smooth_fn(model)
+    return compute_jacobian_faithfulness(molt_fn, mlp_fn, eval_in, JACOBIAN_SAMPLES, device, use_fp16)
 
 
-def compute_jacobian_for_transcoder(model, mlp_fn, eval_in, device="cuda"):
+def compute_jacobian_for_transcoder(model, mlp_fn, eval_in, device="cuda", use_fp16=False):
     """Compute Jacobian faithfulness for a transcoder model."""
-    jac_x = eval_in[:JACOBIAN_SAMPLES]
-
-    def tc_fn(xi):
-        out, _ = model(xi.unsqueeze(0))
-        return out.squeeze(0)
-
-    sims = jacobian_cosine_sim(tc_fn, mlp_fn, jac_x, device=device)
-    return sims.mean().item(), sims.std().item()
+    if use_fp16:
+        model = model.half()
+    tc_fn = _make_tc_fn(model)
+    return compute_jacobian_faithfulness(tc_fn, mlp_fn, eval_in, JACOBIAN_SAMPLES, device, use_fp16)
 
 
 # ---------------------------------------------------------------------------
 # Run functions
 # ---------------------------------------------------------------------------
 
-def run_molt(scale_name, scale_cfg, lam, train_in, train_out, eval_in, eval_out, mlp_fn):
+def run_molt(scale_name, scale_cfg, lam, train_in_cpu, train_out_cpu, eval_in, eval_out, mlp_fn):
     name = f"molt_{scale_name}_lam{lam:.0e}"
     result_path = RESULTS_DIR / f"result_{name}.json"
     if result_path.exists():
@@ -258,15 +302,40 @@ def run_molt(scale_name, scale_cfg, lam, train_in, train_out, eval_in, eval_out,
         device="cuda",
     )
 
+    # Train on GPU
+    train_in_gpu = train_in_cpu.cuda()
+    train_out_gpu = train_out_cpu.cuda()
     start = time.time()
-    model = train_molt_gpu(config, train_in, train_out)
+    model = train_molt_gpu(config, train_in_gpu, train_out_gpu)
     train_time = time.time() - start
+    del train_in_gpu, train_out_gpu
+    gc.collect()
+    torch.cuda.empty_cache()
 
     l0 = compute_l0(model, eval_in)
     nmse = compute_nmse(model, eval_in, eval_out)
+    n_params = sum(p.numel() for p in model.parameters())
 
+    # Save model, reload fresh to clear training memory artifacts
     print(f"  Computing Jacobian faithfulness ({JACOBIAN_SAMPLES} samples)...")
-    jac_mean, jac_std = compute_jacobian_for_molt(model, mlp_fn, eval_in)
+    ckpt_path = RESULTS_DIR / f"_tmp_{name}.pt"
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), ckpt_path)
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    model = MOLT(config).cuda().eval()
+    model.load_state_dict(torch.load(ckpt_path, weights_only=True))
+    ckpt_path.unlink()
+
+    # Use fp16 for large models to avoid OOM during Jacobian computation
+    use_fp16 = scale_name in ("4x", "8x")
+    if use_fp16:
+        mlp_fn_jac = _make_fp16_mlp_fn(mlp_fn)
+    else:
+        mlp_fn_jac = mlp_fn
+    jac_mean, jac_std = compute_jacobian_for_molt(model, mlp_fn_jac, eval_in, use_fp16=use_fp16)
 
     result = {
         "name": name,
@@ -279,7 +348,7 @@ def run_molt(scale_name, scale_cfg, lam, train_in, train_out, eval_in, eval_out,
         "nmse": round(nmse, 6),
         "jacobian_cosine_sim": round(jac_mean, 6),
         "jacobian_cosine_sim_std": round(jac_std, 6),
-        "params": sum(p.numel() for p in model.parameters()),
+        "params": n_params,
         "training_time_s": round(train_time, 1),
     }
 
@@ -294,7 +363,7 @@ def run_molt(scale_name, scale_cfg, lam, train_in, train_out, eval_in, eval_out,
     return result
 
 
-def run_transcoder(scale_name, scale_cfg, lam, train_in, train_out, eval_in, eval_out, mlp_fn):
+def run_transcoder(scale_name, scale_cfg, lam, train_in_cpu, train_out_cpu, eval_in, eval_out, mlp_fn):
     name = f"tc_{scale_name}_lam{lam:.0e}"
     result_path = RESULTS_DIR / f"result_{name}.json"
     if result_path.exists():
@@ -305,16 +374,40 @@ def run_transcoder(scale_name, scale_cfg, lam, train_in, train_out, eval_in, eva
     print(f"\n{'='*60}\nTranscoder: {name}\n{'='*60}")
     n_features = scale_cfg["tc_features"]
 
+    # Train on GPU
+    train_in_gpu = train_in_cpu.cuda()
+    train_out_gpu = train_out_cpu.cuda()
     start = time.time()
     model = train_transcoder_gpu(
-        n_features, scale_cfg["num_epochs"], lam, train_in, train_out,
+        n_features, scale_cfg["num_epochs"], lam, train_in_gpu, train_out_gpu,
     )
     train_time = time.time() - start
+    del train_in_gpu, train_out_gpu
+    gc.collect()
+    torch.cuda.empty_cache()
 
     metrics = evaluate_trainable_transcoder(model, eval_in, eval_out)
+    n_params = model.param_count()
 
+    # Save model, reload fresh to clear training memory artifacts
     print(f"  Computing Jacobian faithfulness ({JACOBIAN_SAMPLES} samples)...")
-    jac_mean, jac_std = compute_jacobian_for_transcoder(model, mlp_fn, eval_in)
+    ckpt_path = RESULTS_DIR / f"_tmp_{name}.pt"
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), ckpt_path)
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    model = TrainableTranscoder(D_MODEL, n_features).cuda().eval()
+    model.load_state_dict(torch.load(ckpt_path, weights_only=True))
+    ckpt_path.unlink()
+
+    use_fp16 = scale_name in ("4x", "8x")
+    if use_fp16:
+        mlp_fn_jac = _make_fp16_mlp_fn(mlp_fn)
+    else:
+        mlp_fn_jac = mlp_fn
+    jac_mean, jac_std = compute_jacobian_for_transcoder(model, mlp_fn_jac, eval_in, use_fp16=use_fp16)
 
     result = {
         "name": name,
@@ -327,7 +420,7 @@ def run_transcoder(scale_name, scale_cfg, lam, train_in, train_out, eval_in, eva
         "nmse": round(metrics["nmse"], 6),
         "jacobian_cosine_sim": round(jac_mean, 6),
         "jacobian_cosine_sim_std": round(jac_std, 6),
-        "params": model.param_count(),
+        "params": n_params,
         "training_time_s": round(train_time, 1),
     }
 
@@ -365,95 +458,37 @@ def plot_l0_vs_jacobian(results: list[dict]) -> None:
     molt_results = [r for r in results if r["method"] == "molt"]
     tc_results = [r for r in results if r["method"] == "transcoder"]
 
-    scale_colors = {"1x": "tab:blue", "2x": "tab:orange", "4x": "tab:green"}
+    from molt.utils.plotting import plot_comparison
 
-    # --- Plot 1: L0 vs Jacobian (main plot) ---
-    fig, ax = plt.subplots(figsize=(10, 7))
+    # Plot 1: Jacobian vs L0 (main plot)
+    plot_comparison(
+        molt_results, tc_results,
+        x_key="jacobian_cosine_sim", y_key="l0",
+        save_path=FIGURES_DIR / "l0_vs_jacobian_all.png",
+        title="Jacobian Faithfulness vs L0 — MOLT vs Transcoder (GPT-2 Layer 6)",
+        x_label="Jacobian Cosine Similarity",
+        y_label="L0 (Active Transforms / Features)",
+    )
 
-    for scale, color in scale_colors.items():
-        molt_s = sorted([r for r in molt_results if r["scale"] == scale], key=lambda r: r["l0"])
-        tc_s = sorted([r for r in tc_results if r["scale"] == scale], key=lambda r: r["l0"])
+    # Plot 2: Jacobian vs NMSE (supplementary)
+    plot_comparison(
+        molt_results, tc_results,
+        x_key="jacobian_cosine_sim", y_key="nmse",
+        save_path=FIGURES_DIR / "nmse_vs_jacobian_all.png",
+        title="Jacobian Faithfulness vs NMSE — MOLT vs Transcoder (GPT-2 Layer 6)",
+        x_label="Jacobian Cosine Similarity",
+        y_label="Normalized MSE",
+    )
 
-        if molt_s:
-            l0s = [r["l0"] for r in molt_s]
-            jacs = [r["jacobian_cosine_sim"] for r in molt_s]
-            ax.scatter(l0s, jacs, marker="o", s=80, color=color, label=f"MOLT {scale}",
-                       edgecolors="black", linewidths=0.5)
-            ax.plot(l0s, jacs, "--", color=color, alpha=0.4, linewidth=1)
-
-        if tc_s:
-            l0s = [r["l0"] for r in tc_s]
-            jacs = [r["jacobian_cosine_sim"] for r in tc_s]
-            ax.scatter(l0s, jacs, marker="x", s=100, color=color, label=f"Transcoder {scale}",
-                       linewidths=2)
-            ax.plot(l0s, jacs, ":", color=color, alpha=0.4, linewidth=1)
-
-    ax.set_xlabel("L0 (Active Transforms / Features)", fontsize=12)
-    ax.set_ylabel("Jacobian Cosine Similarity", fontsize=12)
-    ax.set_title("L0 vs Jacobian Faithfulness — MOLT vs Transcoder (GPT-2 Layer 6)", fontsize=13)
-    ax.set_xscale("log")
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(FIGURES_DIR / "l0_vs_jacobian_all.png", dpi=150)
-    plt.close(fig)
-    print(f"Saved: {FIGURES_DIR / 'l0_vs_jacobian_all.png'}")
-
-    # --- Plot 2: NMSE vs Jacobian (supplementary) ---
-    fig, ax = plt.subplots(figsize=(10, 7))
-
-    for scale, color in scale_colors.items():
-        molt_s = sorted([r for r in molt_results if r["scale"] == scale], key=lambda r: r["nmse"])
-        tc_s = sorted([r for r in tc_results if r["scale"] == scale], key=lambda r: r["nmse"])
-
-        if molt_s:
-            nmses = [r["nmse"] for r in molt_s]
-            jacs = [r["jacobian_cosine_sim"] for r in molt_s]
-            ax.scatter(nmses, jacs, marker="o", s=80, color=color, label=f"MOLT {scale}",
-                       edgecolors="black", linewidths=0.5)
-
-        if tc_s:
-            nmses = [r["nmse"] for r in tc_s]
-            jacs = [r["jacobian_cosine_sim"] for r in tc_s]
-            ax.scatter(nmses, jacs, marker="x", s=100, color=color, label=f"Transcoder {scale}",
-                       linewidths=2)
-
-    ax.set_xlabel("Normalized MSE", fontsize=12)
-    ax.set_ylabel("Jacobian Cosine Similarity", fontsize=12)
-    ax.set_title("NMSE vs Jacobian Faithfulness — MOLT vs Transcoder (GPT-2 Layer 6)", fontsize=13)
-    ax.set_xscale("log")
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(FIGURES_DIR / "nmse_vs_jacobian_all.png", dpi=150)
-    plt.close(fig)
-    print(f"Saved: {FIGURES_DIR / 'nmse_vs_jacobian_all.png'}")
-
-    # --- Plot 3: L0 vs NMSE (reproduce exp 11 for reference) ---
-    fig, ax = plt.subplots(figsize=(10, 7))
-
-    for scale, color in scale_colors.items():
-        molt_s = [r for r in molt_results if r["scale"] == scale]
-        tc_s = [r for r in tc_results if r["scale"] == scale]
-        if molt_s:
-            ax.scatter([r["nmse"] for r in molt_s], [r["l0"] for r in molt_s],
-                       marker="o", s=80, color=color, label=f"MOLT {scale}",
-                       edgecolors="black", linewidths=0.5)
-        if tc_s:
-            ax.scatter([r["nmse"] for r in tc_s], [r["l0"] for r in tc_s],
-                       marker="x", s=100, color=color, label=f"Transcoder {scale}",
-                       linewidths=2)
-
-    ax.set_xlabel("Normalized MSE", fontsize=12)
-    ax.set_ylabel("L0 (Active Transforms / Features)", fontsize=12)
-    ax.set_title("NMSE vs L0 — MOLT vs Transcoder (GPT-2 Layer 6)", fontsize=13)
-    ax.set_xscale("log")
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(FIGURES_DIR / "l0_vs_nmse_all.png", dpi=150)
-    plt.close(fig)
-    print(f"Saved: {FIGURES_DIR / 'l0_vs_nmse_all.png'}")
+    # Plot 3: NMSE vs L0 (reproduce exp 11 for reference)
+    plot_comparison(
+        molt_results, tc_results,
+        x_key="nmse", y_key="l0",
+        save_path=FIGURES_DIR / "l0_vs_nmse_all.png",
+        title="NMSE vs L0 — MOLT vs Transcoder (GPT-2 Layer 6)",
+        x_label="Normalized MSE",
+        y_label="L0 (Active Transforms / Features)",
+    )
 
 
 def main():
@@ -468,14 +503,14 @@ def main():
         plot_l0_vs_jacobian(all_results)
         return
 
-    # Load activations
+    # Load activations (keep on CPU, move to GPU only during training)
     mlp_inputs, mlp_outputs = load_cached_activations(CACHE_PATH)
-    train_in = mlp_inputs[:TRAIN_TOKENS].cuda()
-    train_out = mlp_outputs[:TRAIN_TOKENS].cuda()
+    train_in = mlp_inputs[:TRAIN_TOKENS]
+    train_out = mlp_outputs[:TRAIN_TOKENS]
     eval_in = mlp_inputs[-EVAL_SIZE:]
     eval_out = mlp_outputs[-EVAL_SIZE:]
     del mlp_inputs, mlp_outputs
-    print(f"Train: {train_in.shape} on GPU, Eval: {eval_in.shape} on CPU")
+    print(f"Train: {train_in.shape}, Eval: {eval_in.shape} (both on CPU)")
 
     # Load GPT-2 MLP for Jacobian reference
     mlp_fn = get_gpt2_mlp_fn(device="cuda")
