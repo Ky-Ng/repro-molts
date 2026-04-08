@@ -86,11 +86,9 @@ def init_orthogonal_encoders(model: MOLT):
         for group in model.groups:
             n = group.num_transforms
             if n <= d:
-                # QR on (d, n) random matrix → Q is (d, d), take first n columns
                 q, _ = torch.linalg.qr(torch.randn(d, n))
                 group.encoder.data = q[:, :n].T  # (n, d)
             else:
-                # More transforms than dims: tile orthogonal blocks
                 blocks = []
                 remaining = n
                 while remaining > 0:
@@ -109,10 +107,8 @@ def init_pca_encoders(model: MOLT, mlp_inputs: torch.Tensor, sample_size: int = 
     """
     d = model.config.d_model
     x = mlp_inputs[:sample_size].float()
-    x = x - x.mean(dim=0)  # center
+    x = x - x.mean(dim=0)
 
-    # Compute top singular vectors via SVD on the data matrix
-    # x is (sample_size, d) → U (sample_size, d), S (d,), Vh (d, d)
     _, _, Vh = torch.linalg.svd(x, full_matrices=False)
     # Vh rows are the principal directions, sorted by variance
 
@@ -120,102 +116,14 @@ def init_pca_encoders(model: MOLT, mlp_inputs: torch.Tensor, sample_size: int = 
         offset = 0
         for group in model.groups:
             n = group.num_transforms
-            if offset + n <= d:
-                group.encoder.data = Vh[offset:offset + n]
-            else:
-                # Wrap around if we run out of PCA directions
-                indices = torch.arange(n) % d
-                group.encoder.data = Vh[indices]
+            indices = (torch.arange(n) + offset) % d
+            group.encoder.data = Vh[indices]
             offset += n
 
 
 # ---------------------------------------------------------------------------
-# Custom training loop with gate freezing support
+# Forward with frozen gates
 # ---------------------------------------------------------------------------
-
-def train_with_gate_freeze(
-    config: MOLTConfig,
-    mlp_inputs: torch.Tensor,
-    mlp_outputs: torch.Tensor,
-    gate_freeze_frac: float = 0.0,
-    save_dir: Path | None = None,
-) -> tuple[MOLT, list[dict]]:
-    """Train MOLT with optional gate freezing for the first N% of steps.
-
-    During the frozen period, all gate activations are replaced with 1.0,
-    so every transform contributes equally. This lets UV matrices learn
-    useful directions before gating competition begins.
-    """
-    torch.manual_seed(config.seed)
-    model = MOLT(config).to(config.device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-    dataloader = make_dataloader(mlp_inputs, mlp_outputs, config.batch_size)
-
-    history: list[dict] = []
-    step = 0
-    total_steps = len(dataloader) * config.num_epochs
-    freeze_steps = int(total_steps * gate_freeze_frac)
-
-    for epoch in range(config.num_epochs):
-        pbar = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{config.num_epochs}")
-        for batch_inputs, batch_targets in pbar:
-            batch_inputs = batch_inputs.to(config.device)
-            batch_targets = batch_targets.to(config.device)
-
-            optimizer.zero_grad()
-
-            gates_frozen = step < freeze_steps
-
-            if gates_frozen:
-                # Forward with gates forced to 1.0
-                output, aux = _forward_frozen_gates(model, batch_inputs)
-            else:
-                output, aux = model.forward(batch_inputs)
-
-            mse = F.mse_loss(output, batch_targets)
-            target_var = batch_targets.var()
-            nmse = mse / (target_var + 1e-8)
-
-            # No sparsity penalty (λ=0 for all setups in this experiment)
-            mse.backward()
-            optimizer.step()
-
-            step += 1
-
-            if step % config.log_every == 0:
-                # Always measure real (unfrozen) L0 for logging
-                with torch.no_grad():
-                    _, real_aux = model.forward(batch_inputs)
-                    real_l0 = (torch.cat(real_aux["gate_acts"], dim=1) > 0).float().sum(dim=1).mean()
-
-                log = {
-                    "mse": mse.item(),
-                    "nmse": nmse.item(),
-                    "sparsity_loss": aux["sparsity_loss"].item(),
-                    "l0": real_l0.item(),
-                    "total_loss": mse.item(),
-                    "step": step,
-                    "epoch": epoch,
-                    "gates_frozen": gates_frozen,
-                }
-                history.append(log)
-                frozen_str = " [FROZEN]" if gates_frozen else ""
-                pbar.set_postfix(
-                    mse=f"{mse.item():.4f}",
-                    nmse=f"{nmse.item():.4f}",
-                    l0=f"{real_l0.item():.1f}{frozen_str}",
-                )
-
-    # Save checkpoint
-    if save_dir:
-        save_dir.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            {"model_state_dict": model.state_dict(), "config": vars(config), "history": history},
-            save_dir / "molt_checkpoint.pt",
-        )
-
-    return model, history
-
 
 def _forward_frozen_gates(model: MOLT, x: torch.Tensor) -> tuple[torch.Tensor, dict]:
     """Forward pass with all gates forced to 1.0 (bypassing JumpReLU)."""
@@ -225,13 +133,10 @@ def _forward_frozen_gates(model: MOLT, x: torch.Tensor) -> tuple[torch.Tensor, d
     all_gate_acts = []
 
     for group in model.groups:
-        # Compute transforms as usual
         Vx = torch.einsum("nrd,bd->nbr", group.V, x)
         UVx = torch.einsum("ndr,nbr->nbd", group.U, Vx)
 
-        # Force gate = 1.0 for all transforms and tokens
         gate = torch.ones(x.shape[0], group.num_transforms, device=x.device)
-
         gated = UVx * gate.T.unsqueeze(-1)
         output = output + gated.sum(dim=0)
 
@@ -248,104 +153,17 @@ def _forward_frozen_gates(model: MOLT, x: torch.Tensor) -> tuple[torch.Tensor, d
 
 
 # ---------------------------------------------------------------------------
-# Runner
+# Training loop with custom init + gate freezing
 # ---------------------------------------------------------------------------
 
-def run_setup(
-    name: str,
+def train_custom(
     config: MOLTConfig,
     mlp_inputs: torch.Tensor,
     mlp_outputs: torch.Tensor,
     init_mode: str = "default",
     gate_freeze_frac: float = 0.0,
-) -> dict:
-    """Run a single setup: init, train, eval, save."""
-    print(f"\n{'='*60}")
-    print(f"Running: {name}")
-    print(f"  init={init_mode}, gate_freeze_frac={gate_freeze_frac}")
-    print(f"{'='*60}")
-
-    start_time = time.time()
-
-    if gate_freeze_frac > 0 or init_mode != "default":
-        # Use custom training loop
-        torch.manual_seed(config.seed)
-        model = MOLT(config).to(config.device)
-
-        # Apply custom encoder init
-        if init_mode == "orthogonal":
-            init_orthogonal_encoders(model)
-            print("  Applied orthogonal encoder init")
-        elif init_mode == "pca":
-            init_pca_encoders(model, mlp_inputs)
-            print("  Applied PCA encoder init")
-
-        if gate_freeze_frac > 0:
-            # Move model back to CPU, use custom train loop
-            model = model.cpu()
-            del model
-            torch.cuda.empty_cache()
-
-            # Rebuild inside train loop (it creates its own model)
-            # We need to patch the init after model creation
-            model, history = _train_with_custom_init(
-                config, mlp_inputs, mlp_outputs, init_mode, gate_freeze_frac,
-            )
-        else:
-            # Custom init but standard gate training
-            model = model.cpu()
-            del model
-            torch.cuda.empty_cache()
-            model, history = _train_with_custom_init(
-                config, mlp_inputs, mlp_outputs, init_mode, gate_freeze_frac=0.0,
-            )
-    else:
-        # Baseline: standard training
-        model, history = train_with_gate_freeze(
-            config, mlp_inputs, mlp_outputs, gate_freeze_frac=0.0,
-            save_dir=RESULTS_DIR,
-        )
-
-    training_time = time.time() - start_time
-
-    # Evaluate
-    eval_in = mlp_inputs[-10_000:]
-    eval_out = mlp_outputs[-10_000:]
-    l0 = compute_l0(model, eval_in)
-    nmse = compute_nmse(model, eval_in, eval_out)
-
-    print(f"  Final — L0: {l0:.2f}, NMSE: {nmse:.4f}, time: {training_time:.0f}s")
-
-    result = {
-        "name": name,
-        "init": init_mode,
-        "gate_freeze_frac": gate_freeze_frac,
-        "l0": round(l0, 2),
-        "nmse": round(nmse, 4),
-        "training_time_s": round(training_time, 1),
-    }
-
-    # Save
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    with open(RESULTS_DIR / f"result_{name}.json", "w") as f:
-        json.dump(result, f, indent=2)
-    with open(RESULTS_DIR / f"history_{name}.json", "w") as f:
-        json.dump(history, f, indent=2)
-
-    del model
-    torch.cuda.empty_cache()
-
-    return result
-
-
-def _train_with_custom_init(
-    config: MOLTConfig,
-    mlp_inputs: torch.Tensor,
-    mlp_outputs: torch.Tensor,
-    init_mode: str,
-    gate_freeze_frac: float,
 ) -> tuple[MOLT, list[dict]]:
-    """Create model with custom init, then train with optional gate freezing."""
+    """Train MOLT with optional custom encoder init and gate freezing."""
     torch.manual_seed(config.seed)
     model = MOLT(config).to(config.device)
 
@@ -377,16 +195,21 @@ def _train_with_custom_init(
                 output, aux = model.forward(batch_inputs)
 
             mse = F.mse_loss(output, batch_targets)
-            target_var = batch_targets.var()
-            nmse = mse / (target_var + 1e-8)
             mse.backward()
             optimizer.step()
             step += 1
 
             if step % config.log_every == 0:
+                target_var = batch_targets.var()
+                nmse = mse / (target_var + 1e-8)
+
+                # Always measure real (unfrozen) L0 for logging
                 with torch.no_grad():
                     _, real_aux = model.forward(batch_inputs)
-                    real_l0 = (torch.cat(real_aux["gate_acts"], dim=1) > 0).float().sum(dim=1).mean()
+                    real_l0 = (
+                        (torch.cat(real_aux["gate_acts"], dim=1) > 0)
+                        .float().sum(dim=1).mean()
+                    )
 
                 log = {
                     "mse": mse.item(),
@@ -407,6 +230,60 @@ def _train_with_custom_init(
                 )
 
     return model, history
+
+
+# ---------------------------------------------------------------------------
+# Runner
+# ---------------------------------------------------------------------------
+
+def run_setup(
+    name: str,
+    config: MOLTConfig,
+    mlp_inputs: torch.Tensor,
+    mlp_outputs: torch.Tensor,
+    init_mode: str = "default",
+    gate_freeze_frac: float = 0.0,
+) -> dict:
+    """Run a single setup: init, train, eval, save."""
+    print(f"\n{'='*60}")
+    print(f"Running: {name}")
+    print(f"  init={init_mode}, gate_freeze_frac={gate_freeze_frac}")
+    print(f"{'='*60}")
+
+    start_time = time.time()
+    model, history = train_custom(
+        config, mlp_inputs, mlp_outputs,
+        init_mode=init_mode,
+        gate_freeze_frac=gate_freeze_frac,
+    )
+    training_time = time.time() - start_time
+
+    # Evaluate
+    eval_in = mlp_inputs[-10_000:]
+    eval_out = mlp_outputs[-10_000:]
+    l0 = compute_l0(model, eval_in)
+    nmse = compute_nmse(model, eval_in, eval_out)
+
+    print(f"  Final — L0: {l0:.2f}, NMSE: {nmse:.4f}, time: {training_time:.0f}s")
+
+    result = {
+        "name": name,
+        "init": init_mode,
+        "gate_freeze_frac": gate_freeze_frac,
+        "l0": round(l0, 2),
+        "nmse": round(nmse, 4),
+        "training_time_s": round(training_time, 1),
+    }
+
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(RESULTS_DIR / f"result_{name}.json", "w") as f:
+        json.dump(result, f, indent=2)
+    with open(RESULTS_DIR / f"history_{name}.json", "w") as f:
+        json.dump(history, f, indent=2)
+
+    del model
+    torch.cuda.empty_cache()
+    return result
 
 
 def main():
@@ -443,7 +320,6 @@ def main():
         )
         all_results.append(result)
 
-        # Load history for plotting
         hist_path = RESULTS_DIR / f"history_{setup['name']}.json"
         if hist_path.exists():
             with open(hist_path) as f:
@@ -460,8 +336,10 @@ def main():
         print(f"{'Setup':<30} {'Init':<12} {'Freeze':>7} {'L0':>6} {'NMSE':>8}")
         print("-" * 70)
         for r in all_results:
-            print(f"{r['name']:<30} {r['init']:<12} {r['gate_freeze_frac']:>6.0%} "
-                  f"{r['l0']:>6.2f} {r['nmse']:>8.4f}")
+            print(
+                f"{r['name']:<30} {r['init']:<12} {r['gate_freeze_frac']:>6.0%} "
+                f"{r['l0']:>6.2f} {r['nmse']:>8.4f}"
+            )
 
         if all_histories:
             plot_multi_run_curves(

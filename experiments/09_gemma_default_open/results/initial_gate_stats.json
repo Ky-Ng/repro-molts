@@ -1,0 +1,422 @@
+[
+  {
+    "label": "real_gemma_activations",
+    "num_tokens": 256,
+    "input_norm_mean": 14.576067924499512,
+    "input_norm_std": 1.4507023096084595,
+    "l0": 30.7265625,
+    "total_transforms": 31,
+    "groups": [
+      {
+        "group_idx": 0,
+        "num_transforms": 1,
+        "rank": 512,
+        "active_per_token_mean": 0.99609375,
+        "active_per_token_min": 0.0,
+        "active_per_token_max": 1.0,
+        "fraction_open": 0.99609375,
+        "pre_act_mean": 0.8722980618476868,
+        "pre_act_std": 0.2985115051269531,
+        "pre_act_frac_positive": 0.99609375
+      },
+      {
+        "group_idx": 1,
+        "num_transforms": 2,
+        "rank": 256,
+        "active_per_token_mean": 2.0,
+        "active_per_token_min": 2.0,
+        "active_per_token_max": 2.0,
+        "fraction_open": 1.0,
+        "pre_act_mean": 0.999679684638977,
+        "pre_act_std": 0.27836787700653076,
+        "pre_act_frac_positive": 1.0
+      },
+      {
+        "group_idx": 2,
+        "num_transforms": 4,
+        "rank": 128,
+        "active_per_token_mean": 3.90625,
+        "active_per_token_min": 3.0,
+        "active_per_token_max": 4.0,
+        "fraction_open": 0.9765625,
+        "pre_act_mean": 0.7481052875518799,
+        "pre_act_std": 0.4093593955039978,
+        "pre_act_frac_positive": 0.9765625
+      },
+      {
+        "group_idx": 3,
+        "num_transforms": 8,
+        "rank": 64,
+        "active_per_token_mean": 7.984375,
+        "active_per_token_min": 7.0,
+        "active_per_token_max": 8.0,
+        "fraction_open": 0.998046875,
+        "pre_act_mean": 1.0936698913574219,
+        "pre_act_std": 0.41154274344444275,
+        "pre_act_frac_positive": 0.998046875
+      },
+      {
+        "group_idx": 4,
+        "num_transforms": 16,
+        "rank": 32,
+        "active_per_token_mean": 15.83984375,
+        "active_per_token_min": 13.0,
+        "active_per_token_max": 16.0,
+        "fraction_open": 0.989990234375,
+        "pre_act_mean": 0.9611386060714722,
+        "pre_act_std": 0.4101417362689972,
+        "pre_act_frac_positive": 0.989990234375
+      }
+    ]
+  },
+  {
+    "label": "synthetic_norm5",
+    "num_tokens": 256,
+    "input_norm_mean": 5.0,
+    "input_norm_std": 3.6814745385527203e-07,
+    "l0": 31.0,
+    "total_transforms": 31,
+    "groups": [
+      {
+        "group_idx": 0,
+        "num_transforms": 1,
+        "rank": 512,
+        "active_per_token_mean": 1.0,
+        "active_per_token_min": 1.0,
+        "active_per_token_max": 1.0,
+        "fraction_open": 1.0,
+        "pre_act_mean": 0.9883571863174438,
+        "pre_act_std": 0.15117084980010986,
+        "pre_act_frac_positive": 1.0
+      },
+      {
+        "group_idx": 1,
+        "num_transforms": 2,
+        "rank": 256,
+        "active_per_token_mean": 2.0,
+        "active_per_token_min": 2.0,
+        "active_per_token_max": 2.0,
+        "fraction_open": 1.0,
+        "pre_act_mean": 1.00628662109375,
+        "pre_act_std": 0.14760549366474152,
+        "pre_act_frac_positive": 1.0
+      },
+      {
+        "group_idx": 2,
+        "num_transforms": 4,
+        "rank": 128,
+        "active_per_token_mean": 4.0,
+        "active_per_token_min": 4.0,
+        "active_per_token_max": 4.0,
+        "fraction_open": 1.0,
+        "pre_act_mean": 0.9943181276321411,
+        "pre_act_std": 0.14441373944282532,
+        "pre_act_frac_positive": 1.0
+      },
+      {
+        "group_idx": 3,
+        "num_transforms": 8,
+        "rank": 64,
+        "active_per_token_mean": 8.0,
+        "active_per_token_min": 8.0,
+        "active_per_token_max": 8.0,
+        "fraction_open": 1.0,
+        "pre_act_mean": 1.00298273563385,
+        "pre_act_std": 0.14424996078014374,
+        "pre_act_frac_positive": 1.0
+      },
+      {
+        "group_idx": 4,
+        "num_transforms": 16,
+        "rank": 32,
+        "active_per_token_mean": 16.0,
+        "active_per_token_min": 16.0,
+        "active_per_token_max": 16.0,
+        "fraction_open": 1.0,
+        "pre_act_mean": 0.9967070817947388,
+        "pre_act_std": 0.14835071563720703,
+        "pre_act_frac_positive": 1.0
+      }
+    ]
+  },
+  {
+    "label": "synthetic_norm10",
+    "num_tokens": 256,
+    "input_norm_mean": 10.0,
+    "input_norm_std": 7.362949077105441e-07,
+    "l0": 30.98828125,
+    "total_transforms": 31,
+    "groups": [
+      {
+        "group_idx": 0,
+        "num_transforms": 1,
+        "rank": 512,
+        "active_per_token_mean": 0.99609375,
+        "active_per_token_min": 0.0,
+        "active_per_token_max": 1.0,
+        "fraction_open": 0.99609375,
+        "pre_act_mean": 0.9767144322395325,
+        "pre_act_std": 0.3023416996002197,
+        "pre_act_frac_positive": 0.99609375
+      },
+      {
+        "group_idx": 1,
+        "num_transforms": 2,
+        "rank": 256,
+        "active_per_token_mean": 2.0,
+        "active_per_token_min": 2.0,
+        "active_per_token_max": 2.0,
+        "fraction_open": 1.0,
+        "pre_act_mean": 1.0125732421875,
+        "pre_act_std": 0.29521098732948303,
+        "pre_act_frac_positive": 1.0
+      },
+      {
+        "group_idx": 2,
+        "num_transforms": 4,
+        "rank": 128,
+        "active_per_token_mean": 4.0,
+        "active_per_token_min": 4.0,
+        "active_per_token_max": 4.0,
+        "fraction_open": 1.0,
+        "pre_act_mean": 0.9886361360549927,
+        "pre_act_std": 0.28882747888565063,
+        "pre_act_frac_positive": 1.0
+      },
+      {
+        "group_idx": 3,
+        "num_transforms": 8,
+        "rank": 64,
+        "active_per_token_mean": 8.0,
+        "active_per_token_min": 8.0,
+        "active_per_token_max": 8.0,
+        "fraction_open": 1.0,
+        "pre_act_mean": 1.0059654712677002,
+        "pre_act_std": 0.2884999215602875,
+        "pre_act_frac_positive": 1.0
+      },
+      {
+        "group_idx": 4,
+        "num_transforms": 16,
+        "rank": 32,
+        "active_per_token_mean": 15.9921875,
+        "active_per_token_min": 15.0,
+        "active_per_token_max": 16.0,
+        "fraction_open": 0.99951171875,
+        "pre_act_mean": 0.9934142231941223,
+        "pre_act_std": 0.29670143127441406,
+        "pre_act_frac_positive": 0.99951171875
+      }
+    ]
+  },
+  {
+    "label": "synthetic_norm15_gemma_like",
+    "num_tokens": 256,
+    "input_norm_mean": 15.0,
+    "input_norm_std": 1.1362772056600079e-06,
+    "l0": 30.62890625,
+    "total_transforms": 31,
+    "groups": [
+      {
+        "group_idx": 0,
+        "num_transforms": 1,
+        "rank": 512,
+        "active_per_token_mean": 0.98046875,
+        "active_per_token_min": 0.0,
+        "active_per_token_max": 1.0,
+        "fraction_open": 0.98046875,
+        "pre_act_mean": 0.9650716185569763,
+        "pre_act_std": 0.4535125494003296,
+        "pre_act_frac_positive": 0.98046875
+      },
+      {
+        "group_idx": 1,
+        "num_transforms": 2,
+        "rank": 256,
+        "active_per_token_mean": 1.9765625,
+        "active_per_token_min": 1.0,
+        "active_per_token_max": 2.0,
+        "fraction_open": 0.98828125,
+        "pre_act_mean": 1.01885986328125,
+        "pre_act_std": 0.44281649589538574,
+        "pre_act_frac_positive": 0.98828125
+      },
+      {
+        "group_idx": 2,
+        "num_transforms": 4,
+        "rank": 128,
+        "active_per_token_mean": 3.953125,
+        "active_per_token_min": 3.0,
+        "active_per_token_max": 4.0,
+        "fraction_open": 0.98828125,
+        "pre_act_mean": 0.982954204082489,
+        "pre_act_std": 0.43324121832847595,
+        "pre_act_frac_positive": 0.98828125
+      },
+      {
+        "group_idx": 3,
+        "num_transforms": 8,
+        "rank": 64,
+        "active_per_token_mean": 7.9296875,
+        "active_per_token_min": 7.0,
+        "active_per_token_max": 8.0,
+        "fraction_open": 0.9912109375,
+        "pre_act_mean": 1.0089483261108398,
+        "pre_act_std": 0.43274986743927,
+        "pre_act_frac_positive": 0.9912109375
+      },
+      {
+        "group_idx": 4,
+        "num_transforms": 16,
+        "rank": 32,
+        "active_per_token_mean": 15.7890625,
+        "active_per_token_min": 13.0,
+        "active_per_token_max": 16.0,
+        "fraction_open": 0.98681640625,
+        "pre_act_mean": 0.9901211857795715,
+        "pre_act_std": 0.4450521469116211,
+        "pre_act_frac_positive": 0.98681640625
+      }
+    ]
+  },
+  {
+    "label": "synthetic_norm34_std_normal",
+    "num_tokens": 256,
+    "input_norm_mean": 34.0,
+    "input_norm_std": 2.1232617655186914e-06,
+    "l0": 26.02734375,
+    "total_transforms": 31,
+    "groups": [
+      {
+        "group_idx": 0,
+        "num_transforms": 1,
+        "rank": 512,
+        "active_per_token_mean": 0.828125,
+        "active_per_token_min": 0.0,
+        "active_per_token_max": 1.0,
+        "fraction_open": 0.828125,
+        "pre_act_mean": 0.9208289384841919,
+        "pre_act_std": 1.0279618501663208,
+        "pre_act_frac_positive": 0.828125
+      },
+      {
+        "group_idx": 1,
+        "num_transforms": 2,
+        "rank": 256,
+        "active_per_token_mean": 1.7109375,
+        "active_per_token_min": 0.0,
+        "active_per_token_max": 2.0,
+        "fraction_open": 0.85546875,
+        "pre_act_mean": 1.0427486896514893,
+        "pre_act_std": 1.0037174224853516,
+        "pre_act_frac_positive": 0.85546875
+      },
+      {
+        "group_idx": 2,
+        "num_transforms": 4,
+        "rank": 128,
+        "active_per_token_mean": 3.38671875,
+        "active_per_token_min": 0.0,
+        "active_per_token_max": 4.0,
+        "fraction_open": 0.8466796875,
+        "pre_act_mean": 0.9613630771636963,
+        "pre_act_std": 0.9820134043693542,
+        "pre_act_frac_positive": 0.8466796875
+      },
+      {
+        "group_idx": 3,
+        "num_transforms": 8,
+        "rank": 64,
+        "active_per_token_mean": 6.81640625,
+        "active_per_token_min": 4.0,
+        "active_per_token_max": 8.0,
+        "fraction_open": 0.85205078125,
+        "pre_act_mean": 1.0202828645706177,
+        "pre_act_std": 0.9808996915817261,
+        "pre_act_frac_positive": 0.85205078125
+      },
+      {
+        "group_idx": 4,
+        "num_transforms": 16,
+        "rank": 32,
+        "active_per_token_mean": 13.28515625,
+        "active_per_token_min": 9.0,
+        "active_per_token_max": 16.0,
+        "fraction_open": 0.830322265625,
+        "pre_act_mean": 0.9776080250740051,
+        "pre_act_std": 1.0087848901748657,
+        "pre_act_frac_positive": 0.830322265625
+      }
+    ]
+  },
+  {
+    "label": "synthetic_norm50",
+    "num_tokens": 256,
+    "input_norm_mean": 50.0,
+    "input_norm_std": 3.799708110818756e-06,
+    "l0": 23.1875,
+    "total_transforms": 31,
+    "groups": [
+      {
+        "group_idx": 0,
+        "num_transforms": 1,
+        "rank": 512,
+        "active_per_token_mean": 0.75,
+        "active_per_token_min": 0.0,
+        "active_per_token_max": 1.0,
+        "fraction_open": 0.75,
+        "pre_act_mean": 0.8835721015930176,
+        "pre_act_std": 1.5117084980010986,
+        "pre_act_frac_positive": 0.75
+      },
+      {
+        "group_idx": 1,
+        "num_transforms": 2,
+        "rank": 256,
+        "active_per_token_mean": 1.5390625,
+        "active_per_token_min": 0.0,
+        "active_per_token_max": 2.0,
+        "fraction_open": 0.76953125,
+        "pre_act_mean": 1.0628658533096313,
+        "pre_act_std": 1.4760549068450928,
+        "pre_act_frac_positive": 0.76953125
+      },
+      {
+        "group_idx": 2,
+        "num_transforms": 4,
+        "rank": 128,
+        "active_per_token_mean": 3.01171875,
+        "active_per_token_min": 0.0,
+        "active_per_token_max": 4.0,
+        "fraction_open": 0.7529296875,
+        "pre_act_mean": 0.9431808590888977,
+        "pre_act_std": 1.444137454032898,
+        "pre_act_frac_positive": 0.7529296875
+      },
+      {
+        "group_idx": 3,
+        "num_transforms": 8,
+        "rank": 64,
+        "active_per_token_mean": 6.06640625,
+        "active_per_token_min": 2.0,
+        "active_per_token_max": 8.0,
+        "fraction_open": 0.75830078125,
+        "pre_act_mean": 1.0298277139663696,
+        "pre_act_std": 1.4424995183944702,
+        "pre_act_frac_positive": 0.75830078125
+      },
+      {
+        "group_idx": 4,
+        "num_transforms": 16,
+        "rank": 32,
+        "active_per_token_mean": 11.8203125,
+        "active_per_token_min": 6.0,
+        "active_per_token_max": 16.0,
+        "fraction_open": 0.73876953125,
+        "pre_act_mean": 0.9670706987380981,
+        "pre_act_std": 1.4835071563720703,
+        "pre_act_frac_positive": 0.73876953125
+      }
+    ]
+  }
+]

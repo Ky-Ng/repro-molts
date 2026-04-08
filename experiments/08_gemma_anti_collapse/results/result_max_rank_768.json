@@ -1,0 +1,13 @@
+{
+  "name": "max_rank_768",
+  "activation": "jumprelu",
+  "sparsity_type": "tanh",
+  "learned_threshold": false,
+  "sparsity_coeff": 0.0,
+  "l0": 0.0,
+  "nmse": 1.0007,
+  "final_threshold": null,
+  "num_active": 0,
+  "active_transforms": [],
+  "training_time_s": 17894.4
+}
