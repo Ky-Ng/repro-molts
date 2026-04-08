@@ -45,7 +45,7 @@ def load_results(results_dir: Path, name_filter: str = ""):
     return results
 
 
-def plot_per_config(runs: dict, figures_dir: Path):
+def plot_per_config(runs: dict, figures_dir: Path, results: dict | None = None):
     """One figure per config: 2-3 panel (L0, NMSE, theta if present)."""
     for name, history in runs.items():
         if not history:
@@ -55,7 +55,20 @@ def plot_per_config(runs: dict, figures_dir: Path):
         n_panels = 3 if has_theta else 2
 
         fig, axes = plt.subplots(1, n_panels, figsize=(6 * n_panels, 4.5))
-        fig.suptitle(name.replace("_", " ").title(), fontsize=13, fontweight="bold")
+
+        # Build descriptive title from result metadata if available
+        r = (results or {}).get(name, {})
+        title = name.replace("_", " ").title()
+        subtitle_parts = []
+        if "sparsity_coeff" in r:
+            subtitle_parts.append(f"\u03bb={r['sparsity_coeff']}")
+        if "sparsity_type" in r:
+            subtitle_parts.append(r["sparsity_type"])
+        if "activation" in r:
+            subtitle_parts.append(r["activation"])
+        if subtitle_parts:
+            title += f"\n({', '.join(subtitle_parts)})"
+        fig.suptitle(title, fontsize=13, fontweight="bold")
 
         # L0
         axes[0].plot(steps, [h["l0"] for h in history], color="#2563eb", lw=1.5)
@@ -264,7 +277,7 @@ def main():
 
     # 1. Per-config plots (L0, NMSE, theta over steps)
     print("\n--- Per-config training curves ---")
-    plot_per_config(runs, figures_dir)
+    plot_per_config(runs, figures_dir, results)
 
     # 2. Overlay by lambda (all 4 configs on shared axes)
     print("\n--- Overlay by lambda ---")

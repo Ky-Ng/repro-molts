@@ -66,7 +66,7 @@ def run_single_setup(setup, mlp_inputs, mlp_outputs):
 
     t0 = time.time()
     model, history = train_molt(config, mlp_inputs, mlp_outputs,
-                                save_dir=str(RESULTS_DIR))
+                                save_checkpoint=False)
     elapsed = time.time() - t0
 
     eval_in = mlp_inputs[-10_000:]

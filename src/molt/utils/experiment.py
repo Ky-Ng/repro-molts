@@ -61,7 +61,7 @@ class ExperimentRunner:
               f"learned_threshold={config.learned_threshold}, lambda={config.sparsity_coeff}")
 
         start_time = time.time()
-        model, history = train_molt(config, mlp_inputs, mlp_outputs)
+        model, history = train_molt(config, mlp_inputs, mlp_outputs, save_checkpoint=False)
         training_time = time.time() - start_time
 
         # Evaluate

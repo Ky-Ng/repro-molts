@@ -16,6 +16,7 @@ def train_molt(
     mlp_inputs: torch.Tensor,
     mlp_outputs: torch.Tensor,
     save_dir: str | Path | None = None,
+    save_checkpoint: bool = True,
 ) -> tuple[MOLT, list[dict]]:
     """Train a MOLT model on cached MLP activations.
 
@@ -24,6 +25,8 @@ def train_molt(
         mlp_inputs: (N, d_model) MLP input activations
         mlp_outputs: (N, d_model) MLP output activations
         save_dir: Override checkpoint save directory (defaults to config.save_dir)
+        save_checkpoint: If False, skip saving checkpoint and history files.
+            Useful when the caller (e.g. ExperimentRunner) handles saving itself.
 
     Returns:
         model: trained MOLT
@@ -99,24 +102,24 @@ def train_molt(
 
                     wandb.log(log, step=step)
 
-    # Save checkpoint
-    save_dir = Path(save_dir if save_dir is not None else config.save_dir)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    ckpt_path = save_dir / f"molt_N{config.rank_multiplier}_lam{config.sparsity_coeff}.pt"
-    torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-            "config": vars(config),
-            "history": history,
-        },
-        ckpt_path,
-    )
-    print(f"Saved checkpoint to {ckpt_path}")
+    # Save checkpoint and history
+    if save_checkpoint:
+        save_dir = Path(save_dir if save_dir is not None else config.save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        ckpt_path = save_dir / f"molt_N{config.rank_multiplier}_lam{config.sparsity_coeff}.pt"
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "config": vars(config),
+                "history": history,
+            },
+            ckpt_path,
+        )
+        print(f"Saved checkpoint to {ckpt_path}")
 
-    # Save history
-    history_path = save_dir / f"history_N{config.rank_multiplier}_lam{config.sparsity_coeff}.json"
-    with open(history_path, "w") as f:
-        json.dump(history, f, indent=2)
+        history_path = save_dir / f"history_N{config.rank_multiplier}_lam{config.sparsity_coeff}.json"
+        with open(history_path, "w") as f:
+            json.dump(history, f, indent=2)
 
     if config.wandb_enabled:
         import wandb
