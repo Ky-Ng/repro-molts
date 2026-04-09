@@ -16,6 +16,7 @@ def train_molt(
     mlp_inputs: torch.Tensor,
     mlp_outputs: torch.Tensor,
     save_dir: str | Path | None = None,
+    save_checkpoint: bool = True,
 ) -> tuple[MOLT, list[dict]]:
     """Train a MOLT model on cached MLP activations.
 
@@ -24,6 +25,8 @@ def train_molt(
         mlp_inputs: (N, d_model) MLP input activations
         mlp_outputs: (N, d_model) MLP output activations
         save_dir: Override checkpoint save directory (defaults to config.save_dir)
+        save_checkpoint: If False, skip saving checkpoint and history files.
+            Useful when the caller (e.g. ExperimentRunner) handles saving itself.
 
     Returns:
         model: trained MOLT
@@ -32,7 +35,18 @@ def train_molt(
     torch.manual_seed(config.seed)
 
     model = MOLT(config).to(config.device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+
+    # Separate LR for threshold if configured
+    if config.threshold_lr is not None and model.threshold is not None:
+        threshold_params = [model.threshold]
+        other_params = [p for p in model.parameters() if p is not model.threshold]
+        optimizer = torch.optim.Adam([
+            {"params": other_params, "lr": config.lr},
+            {"params": threshold_params, "lr": config.threshold_lr},
+        ])
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+
     dataloader = make_dataloader(mlp_inputs, mlp_outputs, config.batch_size)
 
     # Optional wandb
@@ -45,6 +59,11 @@ def train_molt(
     step = 0
     total_steps = len(dataloader) * config.num_epochs
     warmup_steps = int(total_steps * config.sparsity_warmup_frac)
+
+    # Threshold freeze: keep θ frozen for first N steps, then unfreeze
+    freeze_steps = int(total_steps * config.threshold_freeze_frac)
+    if freeze_steps > 0 and model.threshold is not None:
+        model.threshold.requires_grad_(False)
 
     for epoch in range(config.num_epochs):
         pbar = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{config.num_epochs}")
@@ -61,6 +80,10 @@ def train_molt(
             optimizer.step()
 
             step += 1
+
+            # Unfreeze threshold after freeze period
+            if step == freeze_steps and model.threshold is not None:
+                model.threshold.requires_grad_(True)
 
             if step % config.log_every == 0:
                 log = {k: v.item() for k, v in metrics.items()}
@@ -79,24 +102,24 @@ def train_molt(
 
                     wandb.log(log, step=step)
 
-    # Save checkpoint
-    save_dir = Path(save_dir if save_dir is not None else config.save_dir)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    ckpt_path = save_dir / f"molt_N{config.rank_multiplier}_lam{config.sparsity_coeff}.pt"
-    torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-            "config": vars(config),
-            "history": history,
-        },
-        ckpt_path,
-    )
-    print(f"Saved checkpoint to {ckpt_path}")
+    # Save checkpoint and history
+    if save_checkpoint:
+        save_dir = Path(save_dir if save_dir is not None else config.save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        ckpt_path = save_dir / f"molt_N{config.rank_multiplier}_lam{config.sparsity_coeff}.pt"
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "config": vars(config),
+                "history": history,
+            },
+            ckpt_path,
+        )
+        print(f"Saved checkpoint to {ckpt_path}")
 
-    # Save history
-    history_path = save_dir / f"history_N{config.rank_multiplier}_lam{config.sparsity_coeff}.json"
-    with open(history_path, "w") as f:
-        json.dump(history, f, indent=2)
+        history_path = save_dir / f"history_N{config.rank_multiplier}_lam{config.sparsity_coeff}.json"
+        with open(history_path, "w") as f:
+            json.dump(history, f, indent=2)
 
     if config.wandb_enabled:
         import wandb

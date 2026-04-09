@@ -26,9 +26,6 @@ htmlcov/
 .ruff_cache/
 
 # Experiment outputs (reproducible from run.py)
-experiments/*/results/*
-experiments/*/figures/*
-experiments/*/logs/*
 !experiments/*/.gitkeep
 !experiments/*/results/.gitkeep
 !experiments/*/figures/.gitkeep

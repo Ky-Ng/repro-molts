@@ -1,0 +1,8 @@
+{
+  "name": "pca_encoders",
+  "init": "pca",
+  "gate_freeze_frac": 0.0,
+  "l0": 0.44,
+  "nmse": 1.4352,
+  "training_time_s": 532.5
+}

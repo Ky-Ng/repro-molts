@@ -1,0 +1,12 @@
+{
+  "name": "tc_2x_lam3e-01",
+  "method": "transcoder",
+  "scale": "2x",
+  "n_features": 5147,
+  "num_epochs": 2,
+  "sparsity_coeff": 0.3,
+  "l0": 1207.07,
+  "nmse": 0.443437,
+  "params": 7911707,
+  "training_time_s": 7.4
+}

@@ -1,0 +1,13 @@
+{
+  "name": "theta_warmup_50pct",
+  "activation": "jumprelu",
+  "sparsity_type": "tanh",
+  "learned_threshold": true,
+  "sparsity_coeff": 0.0,
+  "l0": 0.0,
+  "nmse": 1.0007,
+  "final_threshold": 0.4447,
+  "num_active": 0,
+  "active_transforms": [],
+  "training_time_s": 22771.2
+}

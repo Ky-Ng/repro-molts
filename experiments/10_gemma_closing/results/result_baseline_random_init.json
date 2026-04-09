@@ -1,0 +1,8 @@
+{
+  "name": "baseline_random_init",
+  "init": "default",
+  "gate_freeze_frac": 0.0,
+  "l0": 0.25,
+  "nmse": 1.0538,
+  "training_time_s": 452.4
+}

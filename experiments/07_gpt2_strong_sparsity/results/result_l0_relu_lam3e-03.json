@@ -1,0 +1,169 @@
+{
+  "name": "l0_relu_lam3e-03",
+  "activation": "relu",
+  "sparsity_type": "l0",
+  "learned_threshold": false,
+  "sparsity_coeff": 0.003,
+  "l0": 11.52,
+  "nmse": 0.5267,
+  "final_threshold": null,
+  "num_active": 31,
+  "active_transforms": [
+    {
+      "transform": 0,
+      "rank": 512,
+      "frequency": 63.1
+    },
+    {
+      "transform": 1,
+      "rank": 256,
+      "frequency": 84.6
+    },
+    {
+      "transform": 2,
+      "rank": 256,
+      "frequency": 62.9
+    },
+    {
+      "transform": 3,
+      "rank": 128,
+      "frequency": 61.1
+    },
+    {
+      "transform": 4,
+      "rank": 128,
+      "frequency": 44.5
+    },
+    {
+      "transform": 5,
+      "rank": 128,
+      "frequency": 25.8
+    },
+    {
+      "transform": 6,
+      "rank": 128,
+      "frequency": 69.5
+    },
+    {
+      "transform": 7,
+      "rank": 64,
+      "frequency": 27.1
+    },
+    {
+      "transform": 8,
+      "rank": 64,
+      "frequency": 41.4
+    },
+    {
+      "transform": 9,
+      "rank": 64,
+      "frequency": 38.1
+    },
+    {
+      "transform": 10,
+      "rank": 64,
+      "frequency": 50.4
+    },
+    {
+      "transform": 11,
+      "rank": 64,
+      "frequency": 26.2
+    },
+    {
+      "transform": 12,
+      "rank": 64,
+      "frequency": 69.1
+    },
+    {
+      "transform": 13,
+      "rank": 64,
+      "frequency": 36.7
+    },
+    {
+      "transform": 14,
+      "rank": 64,
+      "frequency": 37.7
+    },
+    {
+      "transform": 15,
+      "rank": 32,
+      "frequency": 23.0
+    },
+    {
+      "transform": 16,
+      "rank": 32,
+      "frequency": 27.1
+    },
+    {
+      "transform": 17,
+      "rank": 32,
+      "frequency": 10.7
+    },
+    {
+      "transform": 18,
+      "rank": 32,
+      "frequency": 10.0
+    },
+    {
+      "transform": 19,
+      "rank": 32,
+      "frequency": 30.3
+    },
+    {
+      "transform": 20,
+      "rank": 32,
+      "frequency": 14.3
+    },
+    {
+      "transform": 21,
+      "rank": 32,
+      "frequency": 37.1
+    },
+    {
+      "transform": 22,
+      "rank": 32,
+      "frequency": 42.4
+    },
+    {
+      "transform": 23,
+      "rank": 32,
+      "frequency": 22.5
+    },
+    {
+      "transform": 24,
+      "rank": 32,
+      "frequency": 85.9
+    },
+    {
+      "transform": 25,
+      "rank": 32,
+      "frequency": 33.0
+    },
+    {
+      "transform": 26,
+      "rank": 32,
+      "frequency": 10.2
+    },
+    {
+      "transform": 27,
+      "rank": 32,
+      "frequency": 13.9
+    },
+    {
+      "transform": 28,
+      "rank": 32,
+      "frequency": 16.4
+    },
+    {
+      "transform": 29,
+      "rank": 32,
+      "frequency": 12.9
+    },
+    {
+      "transform": 30,
+      "rank": 32,
+      "frequency": 64.6
+    }
+  ],
+  "training_time_s": 1020.4
+}

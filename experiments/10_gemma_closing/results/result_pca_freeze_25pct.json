@@ -1,0 +1,8 @@
+{
+  "name": "pca_freeze_25pct",
+  "init": "pca",
+  "gate_freeze_frac": 0.25,
+  "l0": 0.75,
+  "nmse": 1.1523,
+  "training_time_s": 225.6
+}

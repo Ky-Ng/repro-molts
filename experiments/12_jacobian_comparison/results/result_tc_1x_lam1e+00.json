@@ -1,0 +1,14 @@
+{
+  "name": "tc_1x_lam1e+00",
+  "method": "transcoder",
+  "scale": "1x",
+  "n_features": 2573,
+  "num_epochs": 1,
+  "sparsity_coeff": 1.0,
+  "l0": 365.63,
+  "nmse": 0.597739,
+  "jacobian_cosine_sim": 0.296215,
+  "jacobian_cosine_sim_std": 0.031949,
+  "params": 3955469,
+  "training_time_s": 1.6
+}

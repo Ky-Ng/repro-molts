@@ -1,0 +1,14 @@
+{
+  "name": "molt_4x_lam1e-04",
+  "method": "molt",
+  "scale": "4x",
+  "rank_multiplier": 4,
+  "num_epochs": 4,
+  "sparsity_coeff": 0.0001,
+  "l0": 91.64,
+  "nmse": 0.453905,
+  "jacobian_cosine_sim": 0.500385,
+  "jacobian_cosine_sim_std": 0.049992,
+  "params": 15823996,
+  "training_time_s": 26.2
+}
