@@ -465,7 +465,7 @@ def plot_l0_vs_jacobian(results: list[dict]) -> None:
         molt_results, tc_results,
         x_key="jacobian_cosine_sim", y_key="l0",
         save_path=FIGURES_DIR / "l0_vs_jacobian_all.png",
-        title="Jacobian Faithfulness vs L0 — MOLT vs Transcoder (GPT-2 Layer 6)",
+        title="L0 vs Jacobian Faithfulness — MOLT vs Transcoder (GPT-2 Layer 6)",
         x_label="Jacobian Cosine Similarity",
         y_label="L0 (Active Transforms / Features)",
     )
@@ -475,7 +475,7 @@ def plot_l0_vs_jacobian(results: list[dict]) -> None:
         molt_results, tc_results,
         x_key="jacobian_cosine_sim", y_key="nmse",
         save_path=FIGURES_DIR / "nmse_vs_jacobian_all.png",
-        title="Jacobian Faithfulness vs NMSE — MOLT vs Transcoder (GPT-2 Layer 6)",
+        title="NMSE vs Jacobian Faithfulness — MOLT vs Transcoder (GPT-2 Layer 6)",
         x_label="Jacobian Cosine Similarity",
         y_label="Normalized MSE",
     )
@@ -485,7 +485,7 @@ def plot_l0_vs_jacobian(results: list[dict]) -> None:
         molt_results, tc_results,
         x_key="nmse", y_key="l0",
         save_path=FIGURES_DIR / "l0_vs_nmse_all.png",
-        title="NMSE vs L0 — MOLT vs Transcoder (GPT-2 Layer 6)",
+        title="L0 vs NMSE — MOLT vs Transcoder (GPT-2 Layer 6)",
         x_label="Normalized MSE",
         y_label="L0 (Active Transforms / Features)",
     )
