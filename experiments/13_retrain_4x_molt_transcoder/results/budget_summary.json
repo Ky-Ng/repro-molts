@@ -1,0 +1,8 @@
+{
+  "spent": 1.970039,
+  "cap": 20.0,
+  "n_calls": 2122,
+  "prompt_tokens": 4848447,
+  "completion_tokens": 76650,
+  "elapsed_s": 7369.67
+}
