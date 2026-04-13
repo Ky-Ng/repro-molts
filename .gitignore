@@ -31,6 +31,11 @@ htmlcov/
 !experiments/*/figures/.gitkeep
 !experiments/*/logs/.gitkeep
 
+# Bulky / regenerable per-experiment artifacts (checkpoints, latent caches,
+# token caches, intermediate text outputs). Each experiment writes these to
+# its own out/ dir; they're regenerable from run.py.
+experiments/*/out/
+
 # Data (activation caches, checkpoints — too large for git)
 data/**/*.pt
 data/**/
