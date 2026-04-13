@@ -81,8 +81,9 @@ def compute_l0(molt_model, x: torch.Tensor, batch_size: int = 256) -> float:
     with torch.no_grad():
         for i in range(0, len(x), batch_size):
             batch = x[i : i + batch_size].to(next(molt_model.parameters()).device)
-            _, aux = molt_model(batch)
-            total_l0 += aux["l0"].item() * len(batch)
+            gate, _, _ = molt_model(batch)
+            active = (gate > 0).float().sum(dim=1).mean().item()
+            total_l0 += active * len(batch)
             count += len(batch)
 
     return total_l0 / count
@@ -109,8 +110,9 @@ def compute_nmse(
         for i in range(0, len(x), batch_size):
             bx = x[i : i + batch_size].to(device)
             bt = target[i : i + batch_size].to(device)
-            output, _ = molt_model(bx)
-            mse = F.mse_loss(output, bt, reduction="sum").item()
+            # `recons` is in raw activation space (output_standardizer un-standardizes).
+            _, _, recons = molt_model(bx)
+            mse = F.mse_loss(recons, bt, reduction="sum").item()
             total_mse += mse
             count += bt.numel()
 
@@ -149,7 +151,7 @@ def evaluate_molt(
         jac_x = x[:jacobian_samples].to(device).requires_grad_(True)
 
         def molt_fn(xi):
-            out, _ = molt_model(xi.unsqueeze(0))
+            _, _, out = molt_model(xi.unsqueeze(0))
             return out.squeeze(0)
 
         sims = jacobian_faithfulness(molt_fn, mlp_fn, jac_x, batch_size=8)

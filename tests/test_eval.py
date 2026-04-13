@@ -26,6 +26,8 @@ def test_compute_l0():
     config = MOLTConfig(d_model=64, rank_multiplier=1, device="cpu")
     model = MOLT(config)
     x = torch.randn(32, 64)
+    target = torch.randn(32, 64)
+    model.initialize_standardizers(x, target)
     l0 = compute_l0(model, x, batch_size=16)
     assert 0 <= l0 <= config.total_transforms
 
@@ -35,6 +37,7 @@ def test_compute_nmse():
     model = MOLT(config)
     x = torch.randn(32, 64)
     target = torch.randn(32, 64)
+    model.initialize_standardizers(x, target)
     nmse = compute_nmse(model, x, target, batch_size=16)
     assert nmse > 0
 
@@ -44,6 +47,7 @@ def test_evaluate_molt():
     model = MOLT(config)
     x = torch.randn(32, 64)
     target = torch.randn(32, 64)
+    model.initialize_standardizers(x, target)
 
     results = evaluate_molt(model, x, target)
     assert "l0" in results

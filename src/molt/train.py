@@ -36,10 +36,11 @@ def train_molt(
 
     model = MOLT(config).to(config.device)
 
-    # Separate LR for threshold if configured
-    if config.threshold_lr is not None and model.threshold is not None:
-        threshold_params = [model.threshold]
-        other_params = [p for p in model.parameters() if p is not model.threshold]
+    # Separate LR for threshold (nonlinearity.theta) if configured
+    theta_param = getattr(model.nonlinearity, "theta", None)
+    if config.threshold_lr is not None and isinstance(theta_param, torch.nn.Parameter):
+        threshold_params = [theta_param]
+        other_params = [p for p in model.parameters() if p is not theta_param]
         optimizer = torch.optim.Adam([
             {"params": other_params, "lr": config.lr},
             {"params": threshold_params, "lr": config.threshold_lr},
@@ -48,6 +49,13 @@ def train_molt(
         optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 
     dataloader = make_dataloader(mlp_inputs, mlp_outputs, config.batch_size)
+
+    # Initialize standardizers from the first batch (matches crosslayer-transcoder's
+    # MoltModule.training_step: `if batch_idx == 0: model.initialize_standardizers(batch)`).
+    first_inputs, first_targets = next(iter(dataloader))
+    model.initialize_standardizers(
+        first_inputs.to(config.device), first_targets.to(config.device)
+    )
 
     # Optional wandb
     if config.wandb_enabled:
@@ -62,8 +70,8 @@ def train_molt(
 
     # Threshold freeze: keep θ frozen for first N steps, then unfreeze
     freeze_steps = int(total_steps * config.threshold_freeze_frac)
-    if freeze_steps > 0 and model.threshold is not None:
-        model.threshold.requires_grad_(False)
+    if freeze_steps > 0 and isinstance(theta_param, torch.nn.Parameter):
+        theta_param.requires_grad_(False)
 
     for epoch in range(config.num_epochs):
         pbar = tqdm(dataloader, desc=f"Epoch {epoch + 1}/{config.num_epochs}")
@@ -82,8 +90,8 @@ def train_molt(
             step += 1
 
             # Unfreeze threshold after freeze period
-            if step == freeze_steps and model.threshold is not None:
-                model.threshold.requires_grad_(True)
+            if step == freeze_steps and isinstance(theta_param, torch.nn.Parameter):
+                theta_param.requires_grad_(True)
 
             if step % config.log_every == 0:
                 log = {k: v.item() for k, v in metrics.items()}
