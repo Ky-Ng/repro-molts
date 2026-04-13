@@ -91,10 +91,10 @@ def test_load_molt_roundtrip(tmp_path):
 
     model, _ = train_molt(config, inputs, outputs)
 
-    # Get predictions before save
+    # Get predictions before save (forward returns (gate, recons_norm, recons))
     with torch.no_grad():
         x = inputs[:4]
-        expected, _ = model(x)
+        expected_gate, expected_recons_norm, expected_recons = model(x)
 
     # Load from checkpoint
     ckpt_path = list(tmp_path.glob("*.pt"))[0]
@@ -106,8 +106,10 @@ def test_load_molt_roundtrip(tmp_path):
 
     # Verify predictions match
     with torch.no_grad():
-        actual, _ = loaded_model(x)
-    assert torch.allclose(expected, actual, atol=1e-6)
+        actual_gate, actual_recons_norm, actual_recons = loaded_model(x)
+    assert torch.allclose(expected_gate, actual_gate, atol=1e-6)
+    assert torch.allclose(expected_recons_norm, actual_recons_norm, atol=1e-6)
+    assert torch.allclose(expected_recons, actual_recons, atol=1e-6)
 
 
 def test_load_molt_ignores_unknown_keys(tmp_path):

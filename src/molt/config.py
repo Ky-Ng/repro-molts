@@ -32,16 +32,19 @@ class MOLTConfig:
     # MOLT architecture
     # Rank multiplier N: creates N×512, 2N×256, 4N×128, 8N×64, 16N×32
     rank_multiplier: int = 1
-    activation: str = "jumprelu"  # "relu" or "jumprelu"
-    jumprelu_threshold: float = 0.0
-    learned_threshold: bool = False  # if True, JumpReLU threshold is a shared learnable parameter
+    activation: str = "jumprelu"  # kept for config compat; ported model always uses JumpReLU
+    jumprelu_threshold: float = 0.0  # initial value of learnable per-feature theta
+    jumprelu_bandwidth: float = 1.0  # rectangle-kernel bandwidth for the theta STE
+    learned_threshold: bool = True  # ported JumpReLU theta is always learnable (per-feature)
     threshold_freeze_frac: float = 0.0  # fraction of training steps to keep θ frozen before unfreezing
     threshold_lr: float | None = None  # separate LR for threshold (None = same as base lr)
     max_rank: int | None = None  # max rank for rank distribution (None = default 512)
-    sparsity_type: str = "tanh"  # "tanh", "l1", or "l0"
+    sparsity_type: str = "tanh"  # kept for config compat; ported loss uses tanh sparsity
 
     # Training
-    sparsity_coeff: float = 1e-3
+    sparsity_coeff: float = 5e-4  # lambda_sparsity in crosslayer-transcoder (default 5e-4 from molt.yaml)
+    c_sparsity: float = 100.0  # multiplier inside tanh; matches MoltModule.c default
+    use_tanh: bool = True  # apply tanh to weighted per-token activations before summing
     sparsity_warmup_frac: float = 0.1  # fraction of training steps to linearly ramp λ from 0
     lr: float = 1e-3
     batch_size: int = 64
