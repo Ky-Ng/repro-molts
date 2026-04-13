@@ -70,8 +70,9 @@ class ExperimentRunner:
         l0 = compute_l0(model, eval_in)
         nmse = compute_nmse(model, eval_in, eval_out)
 
-        # Threshold (if learned)
-        final_threshold = model.threshold.item() if model.threshold is not None else None
+        # Threshold (if learned): ported JumpReLU stores per-feature theta
+        theta = getattr(model.nonlinearity, "theta", None)
+        final_threshold = theta.detach().mean().item() if theta is not None else None
 
         print(f"  Final -- L0: {l0:.2f}, NMSE: {nmse:.4f}, time: {training_time:.0f}s"
               + (f", theta: {final_threshold:.4f}" if final_threshold is not None else ""))
@@ -128,9 +129,8 @@ class ExperimentRunner:
         active_transforms = []
         with torch.no_grad():
             x = eval_inputs[:sample_size].to(next(model.parameters()).device)
-            _, aux = model(x)
-            all_gates = torch.cat(aux["gate_acts"], dim=1)
-            freq = (all_gates > 0).float().mean(dim=0)
+            gate, _, _ = model(x)
+            freq = (gate > 0).float().mean(dim=0)
 
             cumulative = 0
             for count, rank in config.rank_distribution:
